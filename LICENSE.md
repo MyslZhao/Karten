@@ -4,7 +4,7 @@ Version 2, December 2004
 
 
 
-Copyright (C) 2004 MyslZhao <MyslZhao@github.com>
+Copyright (C) 2004 MyslZhao <VsetMysl@outlook.com>
 
 
 

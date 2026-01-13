@@ -4,3 +4,4 @@ import socket # 后续拆分socket导入
 
 
 pygame.init()
+pass

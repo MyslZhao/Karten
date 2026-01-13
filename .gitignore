@@ -1,0 +1,11 @@
+# 绝对必须忽略的
+build/
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.user
+*.exe
+*.obj
+*.pdb
+.vscode/
+third_party/asio/

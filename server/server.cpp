@@ -73,7 +73,7 @@ public:
     bool operator==(const Card&other)const{
         return id==other.id;
     }
-
+    int a;
 };
 
 

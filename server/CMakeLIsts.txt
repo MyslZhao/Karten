@@ -11,11 +11,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/asio/asio-1.36.0/inc
 add_definitions(-DASIO_STANDALONE)
 
 # 3. 创建可执行文件
-add_executable(SimpleServer server.cpp)
+add_executable(server server.cpp)
 
 # 4. Windows需要链接这些系统库
 if(WIN32)
-    target_link_libraries(SimpleServer ws2_32 mswsock)
+    target_link_libraries(server ws2_32 mswsock)
 endif()
 
 # 输出成功信息

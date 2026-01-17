@@ -31,71 +31,71 @@ using namespace std;
 #include <atomic>
 #define ASIO_STANDALONE
 #include <asio.hpp>
-
+// -*- encoding : gtk -*-
 using namespace std;
 //=============================================================
-//åŸºç¡€æ•°æ®ç»“æ„
+//»ù´¡Êı¾İ½á¹¹
 //=============================================================
-//ç‰Œç±»
+//ÅÆÀà
 class Card{
 public:
-    int suit; //èŠ±è‰²   0:é»‘æ¡ƒ, 1:çº¢å¿ƒ, 2:æ¢…èŠ±, 3:æ–¹å—
-    int value; //ç‚¹æ•°
-    int id;   //å”¯ä¸€æ ‡è¯†
-    int weight; //æƒé‡  ç”¨äºæ¯”å¤§å°
+    int suit; //»¨É«   0:ºÚÌÒ, 1:ºìĞÄ, 2:Ã·»¨, 3:·½¿é
+    int value; //µãÊı
+    int id;   //Î¨Ò»±êÊ¶
+    int weight; //È¨ÖØ  ÓÃÓÚ±È´óĞ¡
     Card(int card_id=0):id(card_id){
         if(id<0||id>53){
-            cout<<"é”™è¯¯ï¼"<<endl;
+            cout<<"´íÎó£¡"<<endl;
             return;
         }
         if(id==52){
-            //å°ç‹
-            suit=0;//èŠ±è‰²åªæœ‰é»‘æ¡ƒ
+            //Ğ¡Íõ
+            suit=0;//»¨É«Ö»ÓĞºÚÌÒ
             value=16;
             weight =16;
         }
         else if(id==53){
-            //å¤§ç‹
+            //´óÍõ
             suit=0;
             value=17;
             weight =17;
         }
         else{
-            //æ™®é€šç‰Œ
+            //ÆÕÍ¨ÅÆ
             suit=id/13;
             value=3+(id%13);
             weight =value;
         }
     }
     string getName()const{
-        //èŠ±è‰²å’Œåå­—
+        //»¨É«ºÍÃû×Ö
         map<int,string> suitNames={
-            {0,"â™ ï¸"},{1,"â™¥ï¸"},{2,"â™£ï¸"},{3,"â™¦"}
+            {0,"??"},{1,"??"},{2,"??"},{3,"?"}
         };
-        // ç‚¹æ•°åå­—
+        // µãÊıÃû×Ö
         map<int, string> valueNames = {
             {3, "3"}, {4, "4"}, {5, "5"}, {6, "6"},
             {7, "7"}, {8, "8"}, {9, "9"}, {10, "10"},
             {11, "J"}, {12, "Q"}, {13, "K"}, {14, "A"},
-            {15, "2"}, {16, "å°ç‹"}, {17, "å¤§ç‹"}
+            {15, "2"}, {16, "Ğ¡Íõ"}, {17, "´óÍõ"}
         };
         if(value>=16){
             return valueNames.at(value);
         }
-        //å…¶ä»–ï¼šç‚¹æ•°+èŠ±è‰²
+        //ÆäËû£ºµãÊı+»¨É«
         string suit_str=(suitNames.count(suit)?suitNames.at(suit):"?");
         string value_str=(valueNames.count(value)?valueNames.at(value):"?");
         return value_str + suit_str;
     }
-    //æ‰“å°ç‰Œå‹
+    //´òÓ¡ÅÆĞÍ
     void print()const{
         cout<<getName();
     }
-    //æ¯”è¾ƒç‰Œçš„å¤§å°
+    //±È½ÏÅÆµÄ´óĞ¡
     bool operator<(const Card& other)const{
         return weight<other.weight;
     }
-    //åˆ¤æ–­ç‰Œå‹æ˜¯å¦ç›¸åŒ
+    //ÅĞ¶ÏÅÆĞÍÊÇ·ñÏàÍ¬
     bool operator==(const Card&other)const{
         return id==other.id;
     }
@@ -103,39 +103,42 @@ public:
 };
 
 enum CardType{
-    INVALID_TYPE,   // æ— æ•ˆç‰Œå‹invalid
-    SINGLE,         // å•å¼ single
-    PAIR,           // å¯¹å­pair
-    TREE,           // ä¸‰å¼ tree
-    TREE_WITH_ONE,  // ä¸‰å¸¦ä¸€
-    TREE_WITH_TWO,  // ä¸‰å¸¦äºŒ
-    STRAIGHT,       // é¡ºå­ (5å¼ æˆ–ä»¥ä¸Šè¿ç»­å•ç‰Œ)
-    BOMB,           // ç‚¸å¼¹ (å››å¼ ç›¸åŒ)
-    ROCKET,         // ç‹ç‚¸ (å¤§ç‹+å°ç‹)
+    INVALID_TYPE,   // ÎŞĞ§ÅÆĞÍinvalid
+    SINGLE,         // µ¥ÕÅsingle
+    PAIR,           // ¶Ô×Ópair
+    TREE,           // ÈıÕÅtree
+    TREE_WITH_ONE,  // Èı´øÒ»
+    TREE_WITH_TWO,  // Èı´ø¶ş
+    STRAIGHT,       // Ë³×Ó (5ÕÅ»òÒÔÉÏÁ¬Ğøµ¥ÅÆ)
+    BOMB,           // Õ¨µ¯ (ËÄÕÅÏàÍ¬)
+    ROCKET,         // ÍõÕ¨ (´óÍõ+Ğ¡Íõ)
+     AIRPLANE,               // ·É»ú²»´ø³á°ò£¨ÖÁÉÙ2¸öÁ¬ĞøÈıÕÅ£©
+    AIRPLANE_WITH_SINGLE,   // ·É»ú´øµ¥³á°ò
+    AIRPLANE_WITH_PAIR      // ·É»ú´ø¶Ô×Ó³á°ò
 };
 /* 
- * 1. åˆ¤æ–­ç‰Œå‹æ˜¯å¦åˆæ³•
- * 2. åˆ¤æ–­èƒ½å¦å‹è¿‡ä¸Šå®¶çš„ç‰Œ
- * 3. è®¡ç®—ç‰Œå‹åˆ†æ•°
- * 4. å…¶ä»–æ¸¸æˆè§„åˆ™
+ * 1. ÅĞ¶ÏÅÆĞÍÊÇ·ñºÏ·¨
+ * 2. ÅĞ¶ÏÄÜ·ñÑ¹¹ıÉÏ¼ÒµÄÅÆ
+ * 3. ¼ÆËãÅÆĞÍ·ÖÊı
+ * 4. ÆäËûÓÎÏ·¹æÔò
 */
 class GameLogic{
     public:
-    //æ£€æŸ¥ç‰Œå‹
+    //¼ì²éÅÆĞÍ
     static CardType checkCardType(const vector<Card>& cards){
         if(cards.empty()) return INVALID_TYPE;
         int n = (int)cards.size();
         vector<Card> sorted = cards;
         sort(sorted.begin(), sorted.end());
 
-        // ç»Ÿè®¡ç‚¹æ•°å‡ºç°æ¬¡æ•°
+        // Í³¼ÆµãÊı³öÏÖ´ÎÊı
         map<int,int> cnt;
         for(const auto &c: sorted) cnt[c.value]++;
 
         if(n == 1) return SINGLE;
 
         if(n == 2){
-            // ç‹ç‚¸
+            // ÍõÕ¨
             if((sorted[0].value == 16 && sorted[1].value == 17) ||
                (sorted[0].value == 17 && sorted[1].value == 16)) return ROCKET;
             if(sorted[0].value == sorted[1].value) return PAIR;
@@ -148,15 +151,15 @@ class GameLogic{
         }
 
         if(n == 4){
-            // ç‚¸å¼¹ï¼šå››å¼ ç›¸åŒ
+            // Õ¨µ¯£ºËÄÕÅÏàÍ¬
             for(auto &p: cnt) if(p.second == 4) return BOMB;
-            // ä¸‰å¸¦ä¸€
+            // Èı´øÒ»
             for(auto &p: cnt) if(p.second == 3) return TREE_WITH_ONE;
             return INVALID_TYPE;
         }
 
         if(n == 5){
-            // ä¸‰å¸¦äºŒ
+            // Èı´ø¶ş
             bool has3 = false, has2 = false;
             for(auto &p: cnt){
                 if(p.second == 3) has3 = true;
@@ -164,9 +167,9 @@ class GameLogic{
             }
             if(has3 && has2) return TREE_WITH_TWO;
 
-            // é¡ºå­ï¼ˆ5å¼ è¿ç»­ï¼Œä¸åŒ…å«2æˆ–ç‹ï¼‰
+            // Ë³×Ó£¨5ÕÅÁ¬Ğø£¬²»°üº¬2»òÍõ£©
             if(cnt.size() == 5){
-                if(sorted.back().value >= 15) return INVALID_TYPE; // ä¸èƒ½åŒ…å«2æˆ–ç‹
+                if(sorted.back().value >= 15) return INVALID_TYPE; // ²»ÄÜ°üº¬2»òÍõ
                 bool ok = true;
                 for(int i=1;i<n;i++){
                     if(sorted[i].value != sorted[i-1].value + 1) { ok = false; break; }
@@ -176,7 +179,7 @@ class GameLogic{
             return INVALID_TYPE;
         }
 
-        // n >= 6ï¼šç›®å‰åªæ”¯æŒé¡ºå­ï¼ˆè‡³å°‘5å¼ è¿ç»­å•ç‰Œï¼‰
+        // n >= 6£ºÄ¿Ç°Ö»Ö§³ÖË³×Ó£¨ÖÁÉÙ5ÕÅÁ¬Ğøµ¥ÅÆ£©
         if(n >= 5){
             if(cnt.size() == n){
                 if(sorted.back().value >= 15) return INVALID_TYPE;
@@ -185,43 +188,58 @@ class GameLogic{
                 }
                 return STRAIGHT;
             }
+            if(n==6&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[6].value){
+                return AIRPLANE;
+            }
+            if((n==7&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[5].value)||(
+                sorted[1].value==sorted[2].value&&sorted[3].value==sorted[4].value&&sorted[5].value==sorted[6].value
+            )){
+                return AIRPLANE_WITH_SINGLE;
+            }
+             if(n==8&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[5].value&&sorted[6].value==sorted[7].value){
+                return AIRPLANE_WITH_SINGLE;
+            }
+            return INVALID_TYPE;
         }
 
         return INVALID_TYPE;
     }
-    //è½¬åŒ–æˆå­—ç¬¦ä¸²
+    //×ª»¯³É×Ö·û´®
      static string getTypeName(CardType type) {
         map<CardType, string> typeNames = {
-            {INVALID_TYPE, "æ— æ•ˆç‰Œå‹"},
-            {SINGLE, "å•å¼ "},
-            {PAIR, "å¯¹å­"},
-            {TREE, "ä¸‰å¼ "},
-            {TREE_WITH_ONE, "ä¸‰å¸¦ä¸€"},
-            {TREE_WITH_TWO, "ä¸‰å¸¦äºŒ"},
-            {STRAIGHT, "é¡ºå­"},
-            {BOMB, "ç‚¸å¼¹"},
-            {ROCKET, "ç‹ç‚¸"},
+            {INVALID_TYPE, "ÎŞĞ§ÅÆĞÍ"},
+            {SINGLE, "µ¥ÕÅ"},
+            {PAIR, "¶Ô×Ó"},
+            {TREE, "ÈıÕÅ"},
+            {TREE_WITH_ONE, "Èı´øÒ»"},
+            {TREE_WITH_TWO, "Èı´ø¶ş"},
+            {STRAIGHT, "Ë³×Ó"},
+            {BOMB, "Õ¨µ¯"},
+            {ROCKET, "ÍõÕ¨"},
+            {AIRPLANE,"·É»ú"},
+            {AIRPLANE_WITH_SINGLE,"·É»ú´øµ¥"},
+             {AIRPLANE_WITH_PAIR,"·É»ú´øË«"},
         };
-        return (typeNames.count(type)?typeNames.at(type):"æœªçŸ¥ç‰Œå‹");
+        return (typeNames.count(type)?typeNames.at(type):"Î´ÖªÅÆĞÍ");
      }
 
 /*
-*æ£€æŸ¥èƒ½å¦å‡ºç‰Œ
-*æ£€æŸ¥ä¸Šå®¶å‡ºçš„ç‰Œ
-*æ£€æŸ¥èƒ½å¦å‡ºç‰Œ
+*¼ì²éÄÜ·ñ³öÅÆ
+*¼ì²éÉÏ¼Ò³öµÄÅÆ
+*¼ì²éÄÜ·ñ³öÅÆ
 */
 
 static bool canPlayCards(const vector<Card>&lastCards,
                         const vector<Card>&currentCards){
-    //æ£€æŸ¥å½“å‰ç‰Œæ˜¯å¦åˆæ³•
+    //¼ì²éµ±Ç°ÅÆÊÇ·ñºÏ·¨
     CardType currentType=checkCardType(currentCards);
     if(currentType==INVALID_TYPE){
         return false;
     }
     if(lastCards.empty()){
-        return true;//ç¬¬ä¸€æ¬¡å‡ºèƒ½å‡ºä»»ä½•åˆæ³•çš„ç‰Œ
+        return true;//µÚÒ»´Î³öÄÜ³öÈÎºÎºÏ·¨µÄÅÆ
     }
-    //æ£€æŸ¥ä¸Šå®¶ç‰Œç‰Œå‹
+    //¼ì²éÉÏ¼ÒÅÆÅÆĞÍ
     CardType lastType=checkCardType(lastCards);
     if(lastType==INVALID_TYPE){
         return false;
@@ -235,13 +253,13 @@ static bool canPlayCards(const vector<Card>&lastCards,
         return true;
        } 
     }
-    //ç›¸åŒç‰Œå‹
+    //ÏàÍ¬ÅÆĞÍ
     if(currentType==lastType){
         if (currentType == STRAIGHT && 
             currentCards.size() != lastCards.size()) {
              return false;
         }
-        //æ¯”è¾ƒä¸»ç‰Œ
+        //±È½ÏÖ÷ÅÆ
         int currentMain=getMainValue(currentCards,currentType);
         int lastMain=getMainValue(lastCards,lastType);
         return (currentMain>lastMain)?true:false;
@@ -250,7 +268,7 @@ static bool canPlayCards(const vector<Card>&lastCards,
     return false;
 
 }
-//å–ä¸»å€¼
+//È¡Ö÷Öµ
 static int getMainValue(const vector<Card>& cards, CardType type){   
     if(cards.empty())return 0;
     vector<Card> sorted = cards;
@@ -276,8 +294,15 @@ static int getMainValue(const vector<Card>& cards, CardType type){
         return sorted.back().weight;
     case ROCKET:
         return 100;
+    case AIRPLANE:
+        return sorted[5].weight;
+    case AIRPLANE_WITH_SINGLE:
+        if(sorted[0].value==sorted[1].value)return sorted.back().weight;
+    case AIRPLANE_WITH_PAIR:
+        return sorted.back().weight;
     default:
         return 0;
+    
     }
 }
 
@@ -295,7 +320,7 @@ static void printCards(const vector<Card>& cards, const string& title = "") {
     
     if(!cards.empty()){
         CardType type = checkCardType(cards);
-        cout << " ã€" << getTypeName(type) << "ã€‘";
+        cout << " ¡¾" << getTypeName(type) << "¡¿";
     }
     cout << endl;
 }
@@ -305,10 +330,10 @@ static void sortCards(vector<Card>&cards){
 
 };
 //====================================================================
-//ç¬¬ä¸‰éƒ¨åˆ†ï¼šæ¸¸æˆå·¥å…·
+//µÚÈı²¿·Ö£ºÓÎÏ·¹¤¾ß
 //====================================================================
 /*
-å‘ç‰Œ
+·¢ÅÆ
 */  
 class GameUtils{
     public:
@@ -319,7 +344,7 @@ class GameUtils{
         }
         return deck;
     }
-    //æ´—ç‰Œ
+    //Ï´ÅÆ
     static void shuffledeck(vector<int>&deck){
         static std::mt19937 rng((unsigned)std::chrono::system_clock::now().time_since_epoch().count());
         std::shuffle(deck.begin(), deck.end(), rng);
@@ -327,17 +352,17 @@ class GameUtils{
     static vector<vector<Card>>dealCards(){
         vector<int>deck=createDeck();
         shuffledeck(deck);
-        vector<vector<Card>>result(4);//ä¸‰ä¸ªç©å®¶å’Œä¸€ä¸ªåº•ç‰Œ
-        //ä¸‰ä¸ªç©å®¶
+        vector<vector<Card>>result(4);//Èı¸öÍæ¼ÒºÍÒ»¸öµ×ÅÆ
+        //Èı¸öÍæ¼Ò
         for(int i=0;i<51;i++){
             int p=i%3;
             result[p].push_back(Card(deck[i]));
         }
-        //åº•ç‰Œ
+        //µ×ÅÆ
         for(int i=51;i<54;i++){
             result[3].push_back(Card(deck[i]));
         }
-        //å¸®ç©å®¶æ’åº
+        //°ïÍæ¼ÒÅÅĞò
         for(int i=0;i<4;i++){
             GameLogic::sortCards(result[i]);
         }
@@ -345,7 +370,7 @@ class GameUtils{
     }
 };     
 //============================================================
-//æœåŠ¡å™¨å®ç°
+//·şÎñÆ÷ÊµÏÖ
 //============================================================
 class ClientSession:public enable_shared_from_this<ClientSession>{
 public:
@@ -355,9 +380,9 @@ public:
     }
     void start(){
         sessionId_=++sessionCounter;
-        cout<<"[æœåŠ¡å™¨] æ–°å®¢æˆ·ç«¯è¿æ¥ï¼Œä¼šè¯ID:"<<sessionId_<<endl;
-        string welcomeMsg="æ¬¢è¿è¿æ¥åˆ°æ–—åœ°ä¸»æœåŠ¡å™¨ï¼\n";
-        welcomeMsg+="ä½ çš„ä¼šè¯ID: " + to_string(sessionId_) + "\n";
+        cout<<"[·şÎñÆ÷] ĞÂ¿Í»§¶ËÁ¬½Ó£¬»á»°ID:"<<sessionId_<<endl;
+        string welcomeMsg="»¶Ó­Á¬½Óµ½¶·µØÖ÷·şÎñÆ÷£¡\n";
+        welcomeMsg+="ÄãµÄ»á»°ID: " + to_string(sessionId_) + "\n";
         sendMsg(welcomeMsg);
         readMessage();
     }
@@ -367,7 +392,7 @@ public:
             asio::buffer(message),
             [this, self](asio::error_code ec, size_t /*length*/) {
                 if(ec) {
-                    cout << "[ä¼šè¯ " << sessionId_ << "] å‘é€å¤±è´¥: " << ec.message() << endl;
+                    cout << "[»á»° " << sessionId_ << "] ·¢ËÍÊ§°Ü: " << ec.message() << endl;
                     close();
                 }
             });
@@ -377,7 +402,7 @@ public:
     void setPlayerId(int id) { playerId_ = id; }
     void close() {
         if(socket_.is_open()) {
-            cout << "[ä¼šè¯ " << sessionId_ << "] å…³é—­è¿æ¥" << endl;
+            cout << "[»á»° " << sessionId_ << "] ¹Ø±ÕÁ¬½Ó" << endl;
             socket_.close();
         }
     }
@@ -392,12 +417,12 @@ private:
                     string message;
                     getline(is, message);
                     
-                    cout << "[ä¼šè¯ " << sessionId_ << "] æ”¶åˆ°: " << message << endl;
+                    cout << "[»á»° " << sessionId_ << "] ÊÕµ½: " << message << endl;
                     handleMessage(message);
                     readMessage();
                 } else {
                     if(ec != asio::error::eof) {
-                        cout << "[ä¼šè¯ " << sessionId_ << "] è¯»å–é”™è¯¯: " << ec.message() << endl;
+                        cout << "[»á»° " << sessionId_ << "] ¶ÁÈ¡´íÎó: " << ec.message() << endl;
                     }
                     close();
                 }
@@ -405,18 +430,18 @@ private:
     }
     
     void handleMessage(const string& message) {
-        // å¤„ç†æ¸¸æˆå‘½ä»¤
+        // ´¦ÀíÓÎÏ·ÃüÁî
         string response = processGameCommand(message);
         sendMsg(response);
     }
     
     string processGameCommand(const string& command) {
-        // ç®€å•çš„å‘½ä»¤è§£æ
+        // ¼òµ¥µÄÃüÁî½âÎö
         if(command == "HELLO") {
-            return "æ¬¢è¿ï¼è¯·åˆ›å»ºæˆ¿é—´æˆ–åŠ å…¥æˆ¿é—´\n";
+            return "»¶Ó­£¡Çë´´½¨·¿¼ä»ò¼ÓÈë·¿¼ä\n";
         }
         else if(command.rfind("PLAY ",0) == 0) {
-            // æ¨¡æ‹Ÿå‡ºç‰Œå‘½ä»¤: PLAY 1 5 9
+            // Ä£Äâ³öÅÆÃüÁî: PLAY 1 5 9
             vector<Card> cards;
             string cardStr = command.substr(5);
             istringstream iss(cardStr);
@@ -426,13 +451,13 @@ private:
             }
             
             CardType type = GameLogic::checkCardType(cards);
-            return string("å‡ºç‰Œ: ") + GameLogic::getTypeName(type) + "\n";
+            return string("³öÅÆ: ") + GameLogic::getTypeName(type) + "\n";
         }
         else if(command == "DEAL") {
             auto dealtCards = GameUtils::dealCards();
-            string response = "å‘ç‰Œå®Œæˆ:\n";
+            string response = "·¢ÅÆÍê³É:\n";
             for(int i=0; i<3; i++) {
-                response += "ç©å®¶" + to_string(i+1) + ": ";
+                response += "Íæ¼Ò" + to_string(i+1) + ": ";
                 for(const auto& card : dealtCards[i]) {
                     response += card.getName() + " ";
                 }
@@ -441,7 +466,7 @@ private:
             return response;
         }
         
-        return string("æœªçŸ¥å‘½ä»¤: ") + command + "\n";
+        return string("Î´ÖªÃüÁî: ") + command + "\n";
     }
     
 private:
@@ -469,7 +494,7 @@ class DouDiZhuServer{
                     sessions_.push_back(session);
                     session->start();
                 } else {
-                    cout << "[æœåŠ¡å™¨] æ¥å—è¿æ¥é”™è¯¯: " << ec.message() << endl;
+                    cout << "[·şÎñÆ÷] ½ÓÊÜÁ¬½Ó´íÎó: " << ec.message() << endl;
                 }
                 
                 if(isRunning_) {
@@ -481,17 +506,17 @@ class DouDiZhuServer{
                 :io_context_(io_context),
                 acceptor_(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)),
           isRunning_(false) {
-        cout << "[æœåŠ¡å™¨] åˆ›å»ºæœåŠ¡å™¨ï¼Œç«¯å£: " << port << endl;
+        cout << "[·şÎñÆ÷] ´´½¨·şÎñÆ÷£¬¶Ë¿Ú: " << port << endl;
     }
     void start() {
         if(isRunning_) {
-            cout << "[æœåŠ¡å™¨] æœåŠ¡å™¨å·²ç»åœ¨è¿è¡Œ" << endl;
+            cout << "[·şÎñÆ÷] ·şÎñÆ÷ÒÑ¾­ÔÚÔËĞĞ" << endl;
             return;
         }
         
         isRunning_ = true;
         startAccept();
-        cout << "[æœåŠ¡å™¨] æœåŠ¡å™¨å¯åŠ¨æˆåŠŸï¼Œç­‰å¾…å®¢æˆ·ç«¯è¿æ¥..." << endl;
+        cout << "[·şÎñÆ÷] ·şÎñÆ÷Æô¶¯³É¹¦£¬µÈ´ı¿Í»§¶ËÁ¬½Ó..." << endl;
     }
     
     void stop() {
@@ -505,16 +530,16 @@ class DouDiZhuServer{
         }
         sessions_.clear();
         
-        cout << "[æœåŠ¡å™¨] æœåŠ¡å™¨å·²åœæ­¢" << endl;
+        cout << "[·şÎñÆ÷] ·şÎñÆ÷ÒÑÍ£Ö¹" << endl;
     }
     
     string getStatus() const {
         stringstream ss;
-        ss << "æœåŠ¡å™¨çŠ¶æ€:\n";
-        ss << "- è¿è¡ŒçŠ¶æ€: " << (isRunning_ ? "è¿è¡Œä¸­" : "å·²åœæ­¢") << "\n";
-        ss << "- å½“å‰è¿æ¥æ•°: " << sessions_.size() << "\n";
+        ss << "·şÎñÆ÷×´Ì¬:\n";
+        ss << "- ÔËĞĞ×´Ì¬: " << (isRunning_ ? "ÔËĞĞÖĞ" : "ÒÑÍ£Ö¹") << "\n";
+        ss << "- µ±Ç°Á¬½ÓÊı: " << sessions_.size() << "\n";
         try{
-            ss << "- ç›‘å¬ç«¯å£: " << acceptor_.local_endpoint().port() << "\n";
+            ss << "- ¼àÌı¶Ë¿Ú: " << acceptor_.local_endpoint().port() << "\n";
         }catch(...){
         }
         return ss.str();
@@ -526,7 +551,7 @@ class DouDiZhuServer{
 class ServerManager {
 public:
     ServerManager() : server_(nullptr), serverThread_(nullptr) {
-        cout << "[æœåŠ¡å™¨ç®¡ç†å™¨] åˆå§‹åŒ–" << endl;
+        cout << "[·şÎñÆ÷¹ÜÀíÆ÷] ³õÊ¼»¯" << endl;
     }
     
     ~ServerManager() {
@@ -535,7 +560,7 @@ public:
     
     void startServer(short port = 8080) {
         if(server_ && server_->isRunning()) {
-            cout << "[æœåŠ¡å™¨ç®¡ç†å™¨] æœåŠ¡å™¨å·²ç»åœ¨è¿è¡Œ" << endl;
+            cout << "[·şÎñÆ÷¹ÜÀíÆ÷] ·şÎñÆ÷ÒÑ¾­ÔÚÔËĞĞ" << endl;
             return;
         }
         
@@ -544,16 +569,16 @@ public:
             server_ = make_unique<DouDiZhuServer>(*io_context_, port);
             
             serverThread_ = make_unique<thread>([this]() {
-                cout << "[æœåŠ¡å™¨çº¿ç¨‹] å¯åŠ¨" << endl;
+                cout << "[·şÎñÆ÷Ïß³Ì] Æô¶¯" << endl;
                 server_->start();
                 io_context_->run();
-                cout << "[æœåŠ¡å™¨çº¿ç¨‹] ç»“æŸ" << endl;
+                cout << "[·şÎñÆ÷Ïß³Ì] ½áÊø" << endl;
             });
             
-            cout << "[æœåŠ¡å™¨ç®¡ç†å™¨] æœåŠ¡å™¨å¯åŠ¨å‘½ä»¤å·²å‘é€" << endl;
+            cout << "[·şÎñÆ÷¹ÜÀíÆ÷] ·şÎñÆ÷Æô¶¯ÃüÁîÒÑ·¢ËÍ" << endl;
             
         } catch(const exception& e) {
-            cerr << "[æœåŠ¡å™¨ç®¡ç†å™¨] å¯åŠ¨å¤±è´¥: " << e.what() << endl;
+            cerr << "[·şÎñÆ÷¹ÜÀíÆ÷] Æô¶¯Ê§°Ü: " << e.what() << endl;
         }
     }
     
@@ -574,12 +599,12 @@ public:
         server_.reset();
         io_context_.reset();
         
-        cout << "[æœåŠ¡å™¨ç®¡ç†å™¨] æœåŠ¡å™¨å·²åœæ­¢" << endl;
+        cout << "[·şÎñÆ÷¹ÜÀíÆ÷] ·şÎñÆ÷ÒÑÍ£Ö¹" << endl;
     }
     
     string getStatus() const {
         if(!server_) {
-            return "æœåŠ¡å™¨æœªå¯åŠ¨";
+            return "·şÎñÆ÷Î´Æô¶¯";
         }
         return server_->getStatus();
     }
@@ -595,53 +620,53 @@ private:
 };
 
 // ====================================================
-// ç¬¬å››éƒ¨åˆ†ï¼šä¸»å‡½æ•°
+// µÚËÄ²¿·Ö£ºÖ÷º¯Êı
 // ====================================================
 
 ServerManager serverManager;
 void showWelcome() {
     cout << "=========================================" << endl;
-    cout << "      æ–—åœ°ä¸»æ¸¸æˆé€»è¾‘ä¸æœåŠ¡å™¨ç³»ç»Ÿ        " << endl;
+    cout << "      ¶·µØÖ÷ÓÎÏ·Âß¼­Óë·şÎñÆ÷ÏµÍ³        " << endl;
     cout << "=========================================" << endl;
     cout << endl;
-    cout << "ç³»ç»ŸåŒ…å«ï¼š" << endl;
-    cout << "1. æ¸¸æˆé€»è¾‘æ¨¡å— - å¤„ç†å‡ºç‰Œè§„åˆ™ã€ç‰Œå‹åˆ¤æ–­" << endl;
-    cout << "2. ç½‘ç»œæœåŠ¡å™¨æ¨¡å— - åŸºäºAsioçš„TCPæœåŠ¡å™¨" << endl;
+    cout << "ÏµÍ³°üº¬£º" << endl;
+    cout << "1. ÓÎÏ·Âß¼­Ä£¿é - ´¦Àí³öÅÆ¹æÔò¡¢ÅÆĞÍÅĞ¶Ï" << endl;
+    cout << "2. ÍøÂç·şÎñÆ÷Ä£¿é - »ùÓÚAsioµÄTCP·şÎñÆ÷" << endl;
     cout << endl;
-    cout << "ç¼–è¯‘å‘½ä»¤ï¼šg++ -std=c++11 -pthread main.cpp -o doudizhu" << endl;
+    cout << "±àÒëÃüÁî£ºg++ -std=c++11 -pthread main.cpp -o doudizhu" << endl;
     cout << "=========================================" << endl;
 }
 
 void showMenu() {
-    cout << "\n============ æ–—åœ°ä¸»ç³»ç»Ÿä¸»èœå• ============" << endl;
-    cout << "1. å¯åŠ¨æ¸¸æˆæœåŠ¡å™¨ï¼ˆç«¯å£8888ï¼‰" << endl;
-    cout << "2. å¯åŠ¨æ¸¸æˆæœåŠ¡å™¨ï¼ˆè‡ªå®šä¹‰ç«¯å£ï¼‰" << endl;
-    cout << "3. åœæ­¢æ¸¸æˆæœåŠ¡å™¨" << endl;
-    cout << "4. æŸ¥çœ‹æœåŠ¡å™¨çŠ¶æ€" << endl;
-    cout << "5. æµ‹è¯•æ¸¸æˆé€»è¾‘" << endl;
-    cout << "0. é€€å‡ºç¨‹åº" << endl;
+    cout << "\n============ ¶·µØÖ÷ÏµÍ³Ö÷²Ëµ¥ ============" << endl;
+    cout << "1. Æô¶¯ÓÎÏ··şÎñÆ÷£¨¶Ë¿Ú8888£©" << endl;
+    cout << "2. Æô¶¯ÓÎÏ··şÎñÆ÷£¨×Ô¶¨Òå¶Ë¿Ú£©" << endl;
+    cout << "3. Í£Ö¹ÓÎÏ··şÎñÆ÷" << endl;
+    cout << "4. ²é¿´·şÎñÆ÷×´Ì¬" << endl;
+    cout << "5. ²âÊÔÓÎÏ·Âß¼­" << endl;
+    cout << "0. ÍË³ö³ÌĞò" << endl;
     cout << "=========================================" << endl;
-    cout << "è¯·è¾“å…¥é€‰é¡¹ (0-5): ";
+    cout << "ÇëÊäÈëÑ¡Ïî (0-5): ";
 }
 
 void testGameLogic() {
-    cout << "\n=== æ¸¸æˆé€»è¾‘æµ‹è¯• ===" << endl;
+    cout << "\n=== ÓÎÏ·Âß¼­²âÊÔ ===" << endl;
     
-    // æµ‹è¯•ä¸€äº›ç‰Œå‹
+    // ²âÊÔÒ»Ğ©ÅÆĞÍ
     vector<Card> single = {Card(0)};
     vector<Card> pair = {Card(0), Card(13)};
     vector<Card> bomb = {Card(0), Card(13), Card(26), Card(39)};
     
-    cout << "æµ‹è¯•ç‰Œå‹è¯†åˆ«:" << endl;
-    GameLogic::printCards(single, "å•å¼ ");
-    GameLogic::printCards(pair, "å¯¹å­");
-    GameLogic::printCards(bomb, "ç‚¸å¼¹");
+    cout << "²âÊÔÅÆĞÍÊ¶±ğ:" << endl;
+    GameLogic::printCards(single, "µ¥ÕÅ");
+    GameLogic::printCards(pair, "¶Ô×Ó");
+    GameLogic::printCards(bomb, "Õ¨µ¯");
     
-    // æµ‹è¯•å‘ç‰Œ
-    cout << "\næµ‹è¯•å‘ç‰ŒåŠŸèƒ½:" << endl;
+    // ²âÊÔ·¢ÅÆ
+    cout << "\n²âÊÔ·¢ÅÆ¹¦ÄÜ:" << endl;
     auto cards = GameUtils::dealCards();
     for(int i=0; i<3; i++) {
-        cout << "ç©å®¶" << (i+1) << " (" << cards[i].size() << "å¼ ): ";
+        cout << "Íæ¼Ò" << (i+1) << " (" << cards[i].size() << "ÕÅ): ";
         for(const auto& card : cards[i]) {
             card.print();
             cout << " ";
@@ -649,27 +674,27 @@ void testGameLogic() {
         cout << endl;
     }
     
-    cout << "\næ¸¸æˆé€»è¾‘æµ‹è¯•å®Œæˆï¼" << endl;
+    cout << "\nÓÎÏ·Âß¼­²âÊÔÍê³É£¡" << endl;
 }
 
-//å›huanåœ°å€127.0.0.1  8080  utf8ç¼–ç 
+//»ØhuanµØÖ·127.0.0.1  8080  utf8±àÂë
 int main(){
     showWelcome();
     
     bool running = true;
     while(running) {
-        showMenu();//çœ‹èœå•
+        showMenu();//¿´²Ëµ¥
         
         int choice;
         cin >> choice;
         
         switch(choice) {
-            case 0://åœæ­¢æ¸¸æˆ
+            case 0://Í£Ö¹ÓÎÏ·
                 if(serverManager.isRunning()) {
-                    cout << "æ­£åœ¨åœæ­¢æœåŠ¡å™¨..." << endl;
+                    cout << "ÕıÔÚÍ£Ö¹·şÎñÆ÷..." << endl;
                     serverManager.stopServer();
                 }
-                cout << "\næ„Ÿè°¢ä½¿ç”¨ï¼Œå†è§ï¼" << endl;
+                cout << "\n¸ĞĞ»Ê¹ÓÃ£¬ÔÙ¼û£¡" << endl;
                 running = false;
                 break;
                 
@@ -679,12 +704,12 @@ int main(){
                 
             case 2: {
                 short port;
-                cout << "è¯·è¾“å…¥ç«¯å£å· (1024-65535): ";
+                cout << "ÇëÊäÈë¶Ë¿ÚºÅ (1024-65535): ";
                 cin >> port;
                 if(port >= 1024 && port <= 65535) {
                     serverManager.startServer(port);
                 } else {
-                    cout << "ç«¯å£å·æ— æ•ˆï¼" << endl;
+                    cout << "¶Ë¿ÚºÅÎŞĞ§£¡" << endl;
                 }
                 break;
             }
@@ -702,11 +727,11 @@ int main(){
                 break;
                 
             default:
-                cout << "æ— æ•ˆé€‰é¡¹ï¼Œè¯·é‡æ–°è¾“å…¥ï¼" << endl;
+                cout << "ÎŞĞ§Ñ¡Ïî£¬ÇëÖØĞÂÊäÈë£¡" << endl;
         }
         
         if(choice != 0) {
-            cout << "\næŒ‰å›è½¦é”®ç»§ç»­...";
+            cout << "\n°´»Ø³µ¼ü¼ÌĞø...";
             cin.ignore();
             cin.get();
         }

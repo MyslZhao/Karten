@@ -31,7 +31,7 @@ using namespace std;
 #include <atomic>
 #define ASIO_STANDALONE
 #include <asio.hpp>
-// -*- encoding : gtk -*-
+
 using namespace std;
 //=============================================================
 //基础数据结构
@@ -112,9 +112,9 @@ enum CardType{
     STRAIGHT,       // 顺子 (5张或以上连续单牌)
     BOMB,           // 炸弹 (四张相同)
     ROCKET,         // 王炸 (大王+小王)
-     AIRPLANE,               // 飞机不带翅膀（至少2个连续三张）
-    AIRPLANE_WITH_SINGLE,   // 飞机带单翅膀
-    AIRPLANE_WITH_PAIR      // 飞机带对子翅膀
+     AIRPLANE,               
+    AIRPLANE_WITH_SINGLE,   
+    AIRPLANE_WITH_PAIR 
 };
 /* 
  * 1. 判断牌型是否合法
@@ -188,7 +188,7 @@ class GameLogic{
                 }
                 return STRAIGHT;
             }
-            if(n==6&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[6].value){
+             if(n==6&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[6].value){
                 return AIRPLANE;
             }
             if((n==7&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[5].value)||(
@@ -216,9 +216,9 @@ class GameLogic{
             {STRAIGHT, "顺子"},
             {BOMB, "炸弹"},
             {ROCKET, "王炸"},
-            {AIRPLANE,"飞机"},
+             {AIRPLANE,"飞机"},
             {AIRPLANE_WITH_SINGLE,"飞机带单"},
-             {AIRPLANE_WITH_PAIR,"飞机带双"},
+             {AIRPLANE_WITH_PAIR,"飞机带双"}
         };
         return (typeNames.count(type)?typeNames.at(type):"未知牌型");
      }
@@ -294,7 +294,7 @@ static int getMainValue(const vector<Card>& cards, CardType type){
         return sorted.back().weight;
     case ROCKET:
         return 100;
-    case AIRPLANE:
+         case AIRPLANE:
         return sorted[5].weight;
     case AIRPLANE_WITH_SINGLE:
         if(sorted[0].value==sorted[1].value)return sorted.back().weight;
@@ -302,7 +302,6 @@ static int getMainValue(const vector<Card>& cards, CardType type){
         return sorted.back().weight;
     default:
         return 0;
-    
     }
 }
 

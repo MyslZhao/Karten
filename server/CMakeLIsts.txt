@@ -3,6 +3,14 @@ project(Karten)
 
 set(CMAKE_CXX_STANDARD 17)
 
+if(MSVC)
+    # 对于 Visual Studio，设置源文件使用 UTF-8 编码
+    # /utf-8 选项告诉编译器将源文件和执行字符集都视为 UTF-8
+    add_compile_options(/utf-8)
+    # 设置执行字符集为 UTF-8（可选，/utf-8 已包含此功能）
+    add_compile_definitions(_UTF8_SOURCE)
+endif()
+
 # 关键：使用独立版Asio
 # 1. 添加Asio头文件路径
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/asio/asio-1.36.0/include)

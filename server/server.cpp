@@ -102,6 +102,9 @@ enum CardType
     STRAIGHT,      // 顺子 (5张或以上连续单牌)
     BOMB,          // 炸弹 (四张相同)
     ROCKET,        // 王炸 (大王+小王)
+    AIRPLANE,               
+    AIRPLANE_WITH_SINGLE,   
+    AIRPLANE_WITH_PAIR 
 };
 /*
  * 1. 判断牌型是否合法
@@ -208,9 +211,21 @@ public:
                 }
                 return STRAIGHT;
             }
+             if(n==6&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[6].value){
+                return AIRPLANE;
+            }
+            if((n==7&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[5].value)||(
+                sorted[1].value==sorted[2].value&&sorted[3].value==sorted[4].value&&sorted[5].value==sorted[6].value
+            )){
+                return AIRPLANE_WITH_SINGLE;
+            }
+             if(n==8&&sorted[0].value==sorted[1].value&&sorted[2].value==sorted[3].value&&sorted[4].value==sorted[5].value&&sorted[6].value==sorted[7].value){
+                return AIRPLANE_WITH_SINGLE;
+            }
+            return INVALID_TYPE;
         }
-
-        return INVALID_TYPE;
+             return INVALID_TYPE;
+        
     }
     // 转化成字符串
     static string getTypeName(CardType type)
@@ -225,6 +240,9 @@ public:
             {STRAIGHT, "顺子"},
             {BOMB, "炸弹"},
             {ROCKET, "王炸"},
+             {AIRPLANE,"飞机"},
+            {AIRPLANE_WITH_SINGLE,"飞机带单"},
+             {AIRPLANE_WITH_PAIR,"飞机带双"}
         };
         return (typeNames.count(type) ? typeNames.at(type) : "未知牌型");
     }
@@ -313,6 +331,12 @@ public:
             return sorted.back().weight;
         case ROCKET:
             return 100;
+          case AIRPLANE:
+            return sorted[5].weight;
+        case AIRPLANE_WITH_SINGLE:
+            if(sorted[0].value==sorted[1].value)return sorted.back().weight;
+        case AIRPLANE_WITH_PAIR:
+            return sorted.back().weight;
         default:
             return 0;
         }

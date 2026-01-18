@@ -18,154 +18,193 @@
 using asio::ip::tcp;
 using namespace std;
 //=============================================================
-//»ù´¡Êı¾İ½á¹¹
+// åŸºç¡€æ•°æ®ç»“æ„
 //=============================================================
-//ÅÆÀà
-class Card{
+// ç‰Œç±»
+class Card
+{
 public:
-    int suit; //»¨É«   0:ºÚÌÒ, 1:ºìĞÄ, 2:Ã·»¨, 3:·½¿é
-    int value; //µãÊı
-    int id;   //Î¨Ò»±êÊ¶
-    int weight; //È¨ÖØ  ÓÃÓÚ±È´óĞ¡
-    Card(int card_id=0):id(card_id){
-        if(id<0||id>53){
-            cout<<"´íÎó£¡"<<endl;
+    int suit;   // èŠ±è‰²   0:é»‘æ¡ƒ, 1:çº¢å¿ƒ, 2:æ¢…èŠ±, 3:æ–¹å—
+    int value;  // ç‚¹æ•°
+    int id;     // å”¯ä¸€æ ‡è¯†
+    int weight; // æƒé‡  ç”¨äºæ¯”å¤§å°
+    Card(int card_id = 0) : id(card_id)
+    {
+        if (id < 0 || id > 53)
+        {
+            cout << "é”™è¯¯ï¼" << endl;
             return;
         }
-        if(id==52){
-            //Ğ¡Íõ
-            suit=0;//»¨É«Ö»ÓĞºÚÌÒ
-            value=16;
-            weight =16;
+        if (id == 52)
+        {
+            // å°ç‹
+            suit = 0; // èŠ±è‰²åªæœ‰é»‘æ¡ƒ
+            value = 16;
+            weight = 16;
         }
-        else if(id==53){
-            //´óÍõ
-            suit=0;
-            value=17;
-            weight =17;
+        else if (id == 53)
+        {
+            // å¤§ç‹
+            suit = 0;
+            value = 17;
+            weight = 17;
         }
-        else{
-            //ÆÕÍ¨ÅÆ
-            suit=id/13;
-            value=3+(id%13);
-            weight =value;
+        else
+        {
+            // æ™®é€šç‰Œ
+            suit = id / 13;
+            value = 3 + (id % 13);
+            weight = value;
         }
     }
-    string getName()const{
-        //»¨É«ºÍÃû×Ö
-        map<int,string> suitNames={
-            {0,"??"},{1,"??"},{2,"??"},{3,"?"}
-        };
-        // µãÊıÃû×Ö
+    string getName() const
+    {
+        // èŠ±è‰²å’Œåå­—
+        map<int, string> suitNames = {
+            {0, "??"}, {1, "??"}, {2, "??"}, {3, "?"}};
+        // ç‚¹æ•°åå­—
         map<int, string> valueNames = {
-            {3, "3"}, {4, "4"}, {5, "5"}, {6, "6"},
-            {7, "7"}, {8, "8"}, {9, "9"}, {10, "10"},
-            {11, "J"}, {12, "Q"}, {13, "K"}, {14, "A"},
-            {15, "2"}, {16, "Ğ¡Íõ"}, {17, "´óÍõ"}
-        };
-        if(value>=16){
+            {3, "3"}, {4, "4"}, {5, "5"}, {6, "6"}, {7, "7"}, {8, "8"}, {9, "9"}, {10, "10"}, {11, "J"}, {12, "Q"}, {13, "K"}, {14, "A"}, {15, "2"}, {16, "å°ç‹"}, {17, "å¤§ç‹"}};
+        if (value >= 16)
+        {
             return valueNames.at(value);
         }
-        //ÆäËû£ºµãÊı+»¨É«
-        string suit_str=(suitNames.count(suit)?suitNames.at(suit):"?");
-        string value_str=(valueNames.count(value)?valueNames.at(value):"?");
+        // å…¶ä»–ï¼šç‚¹æ•°+èŠ±è‰²
+        string suit_str = (suitNames.count(suit) ? suitNames.at(suit) : "?");
+        string value_str = (valueNames.count(value) ? valueNames.at(value) : "?");
         return value_str + suit_str;
     }
-    //´òÓ¡ÅÆĞÍ
-    void print()const{
-        cout<<getName();
+    // æ‰“å°ç‰Œå‹
+    void print() const
+    {
+        cout << getName();
     }
-    //±È½ÏÅÆµÄ´óĞ¡
-    bool operator<(const Card& other)const{
-        return weight<other.weight;
+    // æ¯”è¾ƒç‰Œçš„å¤§å°
+    bool operator<(const Card &other) const
+    {
+        return weight < other.weight;
     }
-    //ÅĞ¶ÏÅÆĞÍÊÇ·ñÏàÍ¬
-    bool operator==(const Card&other)const{
-        return id==other.id;
+    // åˆ¤æ–­ç‰Œå‹æ˜¯å¦ç›¸åŒ
+    bool operator==(const Card &other) const
+    {
+        return id == other.id;
     }
-
 };
 
-enum CardType{
-    INVALID_TYPE,   // ÎŞĞ§ÅÆĞÍinvalid
-    SINGLE,         // µ¥ÕÅsingle
-    PAIR,           // ¶Ô×Ópair
-    TREE,           // ÈıÕÅtree
-    TREE_WITH_ONE,  // Èı´øÒ»
-    TREE_WITH_TWO,  // Èı´ø¶ş
-    STRAIGHT,       // Ë³×Ó (5ÕÅ»òÒÔÉÏÁ¬Ğøµ¥ÅÆ)
-    BOMB,           // Õ¨µ¯ (ËÄÕÅÏàÍ¬)
-    ROCKET,         // ÍõÕ¨ (´óÍõ+Ğ¡Íõ)
+enum CardType
+{
+    INVALID_TYPE,  // æ— æ•ˆç‰Œå‹invalid
+    SINGLE,        // å•å¼ single
+    PAIR,          // å¯¹å­pair
+    TREE,          // ä¸‰å¼ tree
+    TREE_WITH_ONE, // ä¸‰å¸¦ä¸€
+    TREE_WITH_TWO, // ä¸‰å¸¦äºŒ
+    STRAIGHT,      // é¡ºå­ (5å¼ æˆ–ä»¥ä¸Šè¿ç»­å•ç‰Œ)
+    BOMB,          // ç‚¸å¼¹ (å››å¼ ç›¸åŒ)
+    ROCKET,        // ç‹ç‚¸ (å¤§ç‹+å°ç‹)
 };
 /*
- * 1. ÅĞ¶ÏÅÆĞÍÊÇ·ñºÏ·¨
- * 2. ÅĞ¶ÏÄÜ·ñÑ¹¹ıÉÏ¼ÒµÄÅÆ
- * 3. ¼ÆËãÅÆĞÍ·ÖÊı
- * 4. ÆäËûÓÎÏ·¹æÔò
+ * 1. åˆ¤æ–­ç‰Œå‹æ˜¯å¦åˆæ³•
+ * 2. åˆ¤æ–­èƒ½å¦å‹è¿‡ä¸Šå®¶çš„ç‰Œ
+ * 3. è®¡ç®—ç‰Œå‹åˆ†æ•°
+ * 4. å…¶ä»–æ¸¸æˆè§„åˆ™
  */
-class GameLogic{
+class GameLogic
+{
 public:
-    //¼ì²éÅÆĞÍ
-    static CardType checkCardType(const vector<Card>& cards){
-        if(cards.empty()) return INVALID_TYPE;
+    // æ£€æŸ¥ç‰Œå‹
+    static CardType checkCardType(const vector<Card> &cards)
+    {
+        if (cards.empty())
+            return INVALID_TYPE;
         int n = (int)cards.size();
         vector<Card> sorted = cards;
         sort(sorted.begin(), sorted.end());
 
-        // Í³¼ÆµãÊı³öÏÖ´ÎÊı
-        map<int,int> cnt;
-        for(const auto &c: sorted) cnt[c.value]++;
+        // ç»Ÿè®¡ç‚¹æ•°å‡ºç°æ¬¡æ•°
+        map<int, int> cnt;
+        for (const auto &c : sorted)
+            cnt[c.value]++;
 
-        if(n == 1) return SINGLE;
+        if (n == 1)
+            return SINGLE;
 
-        if(n == 2){
-            // ÍõÕ¨
-            if((sorted[0].value == 16 && sorted[1].value == 17) ||
-               (sorted[0].value == 17 && sorted[1].value == 16)) return ROCKET;
-            if(sorted[0].value == sorted[1].value) return PAIR;
+        if (n == 2)
+        {
+            // ç‹ç‚¸
+            if ((sorted[0].value == 16 && sorted[1].value == 17) ||
+                (sorted[0].value == 17 && sorted[1].value == 16))
+                return ROCKET;
+            if (sorted[0].value == sorted[1].value)
+                return PAIR;
             return INVALID_TYPE;
         }
 
-        if(n == 3){
-            if(cnt.size() == 1) return TREE;
+        if (n == 3)
+        {
+            if (cnt.size() == 1)
+                return TREE;
             return INVALID_TYPE;
         }
 
-        if(n == 4){
-            // Õ¨µ¯£ºËÄÕÅÏàÍ¬
-            for(auto &p: cnt) if(p.second == 4) return BOMB;
-            // Èı´øÒ»
-            for(auto &p: cnt) if(p.second == 3) return TREE_WITH_ONE;
+        if (n == 4)
+        {
+            // ç‚¸å¼¹ï¼šå››å¼ ç›¸åŒ
+            for (auto &p : cnt)
+                if (p.second == 4)
+                    return BOMB;
+            // ä¸‰å¸¦ä¸€
+            for (auto &p : cnt)
+                if (p.second == 3)
+                    return TREE_WITH_ONE;
             return INVALID_TYPE;
         }
 
-        if(n == 5){
-            // Èı´ø¶ş
+        if (n == 5)
+        {
+            // ä¸‰å¸¦äºŒ
             bool has3 = false, has2 = false;
-            for(auto &p: cnt){
-                if(p.second == 3) has3 = true;
-                if(p.second == 2) has2 = true;
+            for (auto &p : cnt)
+            {
+                if (p.second == 3)
+                    has3 = true;
+                if (p.second == 2)
+                    has2 = true;
             }
-            if(has3 && has2) return TREE_WITH_TWO;
+            if (has3 && has2)
+                return TREE_WITH_TWO;
 
-            // Ë³×Ó£¨5ÕÅÁ¬Ğø£¬²»°üº¬2»òÍõ£©
-            if(cnt.size() == 5){
-                if(sorted.back().value >= 15) return INVALID_TYPE; // ²»ÄÜ°üº¬2»òÍõ
+            // é¡ºå­ï¼ˆ5å¼ è¿ç»­ï¼Œä¸åŒ…å«2æˆ–ç‹ï¼‰
+            if (cnt.size() == 5)
+            {
+                if (sorted.back().value >= 15)
+                    return INVALID_TYPE; // ä¸èƒ½åŒ…å«2æˆ–ç‹
                 bool ok = true;
-                for(int i=1;i<n;i++){
-                    if(sorted[i].value != sorted[i-1].value + 1) { ok = false; break; }
+                for (int i = 1; i < n; i++)
+                {
+                    if (sorted[i].value != sorted[i - 1].value + 1)
+                    {
+                        ok = false;
+                        break;
+                    }
                 }
-                if(ok) return STRAIGHT;
+                if (ok)
+                    return STRAIGHT;
             }
             return INVALID_TYPE;
         }
 
-        // n >= 6£ºÄ¿Ç°Ö»Ö§³ÖË³×Ó£¨ÖÁÉÙ5ÕÅÁ¬Ğøµ¥ÅÆ£©
-        if(n >= 5){
-            if(cnt.size() == n){
-                if(sorted.back().value >= 15) return INVALID_TYPE;
-                for(int i=1;i<n;i++){
-                    if(sorted[i].value != sorted[i-1].value + 1) return INVALID_TYPE;
+        // n >= 6ï¼šç›®å‰åªæ”¯æŒé¡ºå­ï¼ˆè‡³å°‘5å¼ è¿ç»­å•ç‰Œï¼‰
+        if (n >= 5)
+        {
+            if (cnt.size() == n)
+            {
+                if (sorted.back().value >= 15)
+                    return INVALID_TYPE;
+                for (int i = 1; i < n; i++)
+                {
+                    if (sorted[i].value != sorted[i - 1].value + 1)
+                        return INVALID_TYPE;
                 }
                 return STRAIGHT;
             }
@@ -173,86 +212,100 @@ public:
 
         return INVALID_TYPE;
     }
-    //×ª»¯³É×Ö·û´®
-     static string getTypeName(CardType type) {
+    // è½¬åŒ–æˆå­—ç¬¦ä¸²
+    static string getTypeName(CardType type)
+    {
         map<CardType, string> typeNames = {
-            {INVALID_TYPE, "ÎŞĞ§ÅÆĞÍ"},
-            {SINGLE, "µ¥ÕÅ"},
-            {PAIR, "¶Ô×Ó"},
-            {TREE, "ÈıÕÅ"},
-            {TREE_WITH_ONE, "Èı´øÒ»"},
-            {TREE_WITH_TWO, "Èı´ø¶ş"},
-            {STRAIGHT, "Ë³×Ó"},
-            {BOMB, "Õ¨µ¯"},
-            {ROCKET, "ÍõÕ¨"},
+            {INVALID_TYPE, "æ— æ•ˆç‰Œå‹"},
+            {SINGLE, "å•å¼ "},
+            {PAIR, "å¯¹å­"},
+            {TREE, "ä¸‰å¼ "},
+            {TREE_WITH_ONE, "ä¸‰å¸¦ä¸€"},
+            {TREE_WITH_TWO, "ä¸‰å¸¦äºŒ"},
+            {STRAIGHT, "é¡ºå­"},
+            {BOMB, "ç‚¸å¼¹"},
+            {ROCKET, "ç‹ç‚¸"},
         };
-        return (typeNames.count(type)?typeNames.at(type):"Î´ÖªÅÆĞÍ");
+        return (typeNames.count(type) ? typeNames.at(type) : "æœªçŸ¥ç‰Œå‹");
     }
 
     /*
-*¼ì²éÄÜ·ñ³öÅÆ
-*¼ì²éÉÏ¼Ò³öµÄÅÆ
-*¼ì²éÄÜ·ñ³öÅÆ
+     *æ£€æŸ¥èƒ½å¦å‡ºç‰Œ
+     *æ£€æŸ¥ä¸Šå®¶å‡ºçš„ç‰Œ
+     *æ£€æŸ¥èƒ½å¦å‡ºç‰Œ
      */
 
-static bool canPlayCards(const vector<Card>&lastCards,
-                        const vector<Card>&currentCards){
-    //¼ì²éµ±Ç°ÅÆÊÇ·ñºÏ·¨
-    CardType currentType=checkCardType(currentCards);
-    if(currentType==INVALID_TYPE){
+    static bool canPlayCards(const vector<Card> &lastCards,
+                             const vector<Card> &currentCards)
+    {
+        // æ£€æŸ¥å½“å‰ç‰Œæ˜¯å¦åˆæ³•
+        CardType currentType = checkCardType(currentCards);
+        if (currentType == INVALID_TYPE)
+        {
             return false;
         }
-    if(lastCards.empty()){
-        return true;//µÚÒ»´Î³öÄÜ³öÈÎºÎºÏ·¨µÄÅÆ
+        if (lastCards.empty())
+        {
+            return true; // ç¬¬ä¸€æ¬¡å‡ºèƒ½å‡ºä»»ä½•åˆæ³•çš„ç‰Œ
         }
-    //¼ì²éÉÏ¼ÒÅÆÅÆĞÍ
-    CardType lastType=checkCardType(lastCards);
-    if(lastType==INVALID_TYPE){
+        // æ£€æŸ¥ä¸Šå®¶ç‰Œç‰Œå‹
+        CardType lastType = checkCardType(lastCards);
+        if (lastType == INVALID_TYPE)
+        {
             return false;
         }
-    if(currentType==ROCKET){
+        if (currentType == ROCKET)
+        {
             return true;
-
         }
-    if(currentType==BOMB){
-       if(lastType!=BOMB&&lastType!=ROCKET){
+        if (currentType == BOMB)
+        {
+            if (lastType != BOMB && lastType != ROCKET)
+            {
                 return true;
             }
         }
-    //ÏàÍ¬ÅÆĞÍ
-    if(currentType==lastType){
+        // ç›¸åŒç‰Œå‹
+        if (currentType == lastType)
+        {
             if (currentType == STRAIGHT &&
-            currentCards.size() != lastCards.size()) {
+                currentCards.size() != lastCards.size())
+            {
                 return false;
             }
-        //±È½ÏÖ÷ÅÆ
-        int currentMain=getMainValue(currentCards,currentType);
-        int lastMain=getMainValue(lastCards,lastType);
-        return (currentMain>lastMain)?true:false;
-
+            // æ¯”è¾ƒä¸»ç‰Œ
+            int currentMain = getMainValue(currentCards, currentType);
+            int lastMain = getMainValue(lastCards, lastType);
+            return (currentMain > lastMain) ? true : false;
         }
         return false;
-
     }
-//È¡Ö÷Öµ
-static int getMainValue(const vector<Card>& cards, CardType type){   
-    if(cards.empty())return 0;
+    // å–ä¸»å€¼
+    static int getMainValue(const vector<Card> &cards, CardType type)
+    {
+        if (cards.empty())
+            return 0;
         vector<Card> sorted = cards;
         sort(sorted.begin(), sorted.end());
-    switch(type){
+        switch (type)
+        {
         case SINGLE:
         case PAIR:
         case TREE:
         case BOMB:
             return sorted.back().weight;
         case TREE_WITH_ONE:
-    case TREE_WITH_TWO:{
-        map<int,int>mp;
-        for(const auto &it:sorted){
+        case TREE_WITH_TWO:
+        {
+            map<int, int> mp;
+            for (const auto &it : sorted)
+            {
                 mp[it.value]++;
             }
-        for(const auto &it:mp){
-            if(it.second==3) return it.first;
+            for (const auto &it : mp)
+            {
+                if (it.second == 3)
+                    return it.first;
             }
             return 0;
         }
@@ -265,218 +318,247 @@ static int getMainValue(const vector<Card>& cards, CardType type){
         }
     }
 
-static void printCards(const vector<Card>& cards, const string& title = "") {
-    if(!title.empty()){
+    static void printCards(const vector<Card> &cards, const string &title = "")
+    {
+        if (!title.empty())
+        {
             cout << title << ": ";
         }
 
-    for(size_t i=0; i<cards.size(); i++){
+        for (size_t i = 0; i < cards.size(); i++)
+        {
             cards[i].print();
-        if(i<cards.size()-1){
+            if (i < cards.size() - 1)
+            {
                 cout << " ";
             }
         }
 
-    if(!cards.empty()){
+        if (!cards.empty())
+        {
             CardType type = checkCardType(cards);
-        cout << " ¡¾" << getTypeName(type) << "¡¿";
+            cout << " ã€" << getTypeName(type) << "ã€‘";
         }
         cout << endl;
     }
-static void sortCards(vector<Card>&cards){
-    sort(cards.begin(),cards.end());
+    static void sortCards(vector<Card> &cards)
+    {
+        sort(cards.begin(), cards.end());
     }
-
 };
 //====================================================================
-//µÚÈı²¿·Ö£ºÓÎÏ·¹¤¾ß
+// ç¬¬ä¸‰éƒ¨åˆ†ï¼šæ¸¸æˆå·¥å…·
 //====================================================================
 /*
-·¢ÅÆ
+å‘ç‰Œ
 */
-class GameUtils{
+class GameUtils
+{
 public:
-    static vector<int>createDeck(){
-        vector<int>deck;
-        for(int i=0;i<54;i++){
+    static vector<int> createDeck()
+    {
+        vector<int> deck;
+        for (int i = 0; i < 54; i++)
+        {
             deck.push_back(i);
         }
         return deck;
     }
-    //Ï´ÅÆ
-    static void shuffledeck(vector<int>&deck){
+    // æ´—ç‰Œ
+    static void shuffledeck(vector<int> &deck)
+    {
         static std::mt19937 rng((unsigned)std::chrono::system_clock::now().time_since_epoch().count());
         std::shuffle(deck.begin(), deck.end(), rng);
     }
-    static vector<vector<Card>>dealCards(){
-        vector<int>deck=createDeck();
+    static vector<vector<Card>> dealCards()
+    {
+        vector<int> deck = createDeck();
         shuffledeck(deck);
-        vector<vector<Card>>result(4);//Èı¸öÍæ¼ÒºÍÒ»¸öµ×ÅÆ
-        //Èı¸öÍæ¼Ò
-        for(int i=0;i<51;i++){
-            int p=i%3;
+        vector<vector<Card>> result(4); // ä¸‰ä¸ªç©å®¶å’Œä¸€ä¸ªåº•ç‰Œ
+        // ä¸‰ä¸ªç©å®¶
+        for (int i = 0; i < 51; i++)
+        {
+            int p = i % 3;
             result[p].push_back(Card(deck[i]));
         }
-        //µ×ÅÆ
-        for(int i=51;i<54;i++){
+        // åº•ç‰Œ
+        for (int i = 51; i < 54; i++)
+        {
             result[3].push_back(Card(deck[i]));
         }
-        //°ïÍæ¼ÒÅÅĞò
-        for(int i=0;i<4;i++){
+        // å¸®ç©å®¶æ’åº
+        for (int i = 0; i < 4; i++)
+        {
             GameLogic::sortCards(result[i]);
         }
         return result;
     }
 };
 //============================================================
-//·şÎñÆ÷ÊµÏÖ
+// æœåŠ¡å™¨å®ç°
 //============================================================
 
 bool START = false;
 
 /**
  * @class Session
- * @brief Òì²½·şÎñÆ÷ÈÎÎñÀà
- * @details 
- * ½«Á¬½Ó·â×°³ÉÖ»ÓĞ`Recv`Óë`Send`·½·¨µÄ¶ÔÏó£¬ 
- * ·½±ãºóĞøËæµ÷ËæÓÃ
+ * @brief å¼‚æ­¥æœåŠ¡å™¨ä»»åŠ¡ç±»
+ * @details
+ * å°†è¿æ¥å°è£…æˆåªæœ‰`Recv`ä¸`Send`æ–¹æ³•çš„å¯¹è±¡ï¼Œ
+ * æ–¹ä¾¿åç»­éšè°ƒéšç”¨
  * @author MyslZhao
  */
-class Session : public enable_shared_from_this<Session>{
-    private:
+class Session : public enable_shared_from_this<Session>
+{
+private:
     tcp::socket socket_;
     asio::streambuf buffer_;
 
-    public:
-    Session(tcp::socket socket) : socket_(move(socket)){};
-    void Recv(string& tag);
+public:
+    Session(tcp::socket socket) : socket_(move(socket)) {};
+    void Recv(string &tag);
     void Send(string tag);
 
-    private:
-    void do_read(string& tag);
-    void on_read(const asio::error_code& error, size_t length, string& tag);
+private:
+    void do_read(string &tag);
+    void on_read(const asio::error_code &error, size_t length, string &tag);
     void do_write(string tag);
-    void on_write(const asio::error_code& error, size_t length);
+    void on_write(const asio::error_code &error, size_t length);
 };
 
 /**
- * Òì²½½ÓÊÜÊı¾İ·½·¨Èë¿Ú
- * 
- * @param tag Êı¾İ½ÓÊÜÔØÌå
+ * å¼‚æ­¥æ¥å—æ•°æ®æ–¹æ³•å…¥å£
+ *
+ * @param tag æ•°æ®æ¥å—è½½ä½“
  */
-void Session::Recv(string& tag){
+void Session::Recv(string &tag)
+{
     do_read(tag);
 };
 
 /**
- * Òì²½
+ * å¼‚æ­¥
  */
-void Session::Send(string tag){
+void Session::Send(string tag)
+{
     do_write(tag);
 };
 
 /**
- * @brief Òì²½½ÓÊÜÊı¾İ£¨TCP½×¶Î£©  
+ * @brief å¼‚æ­¥æ¥å—æ•°æ®ï¼ˆTCPé˜¶æ®µï¼‰
  * @details
- * ÉùÃ÷Îª`private`  
- * 
- * ÓÉ`Session::Recv`µ÷ÓÃ
- * 
- * @param tag Êı¾İ½ÓÊÜÔØÌå
+ * å£°æ˜ä¸º`private`
+ *
+ * ç”±`Session::Recv`è°ƒç”¨
+ *
+ * @param tag æ•°æ®æ¥å—è½½ä½“
  */
-void Session::do_read(string& tag){
+void Session::do_read(string &tag)
+{
     async_read_until(socket_, buffer_, '\n',
-        [self = weak_from_this(), &tag](const asio::error_code& error, size_t length){
-            auto shared_self = self.lock();
-            if (shared_self){
-                shared_self -> on_read(error, length, tag);
-            }
-        }
-    );
+                     [self = weak_from_this(), &tag](const asio::error_code &error, size_t length)
+                     {
+                         auto shared_self = self.lock();
+                         if (shared_self)
+                         {
+                             shared_self->on_read(error, length, tag);
+                         }
+                     });
 }
 
 /**
- * @brief ´Ó»º³åÇø¶ÁÈ¡µ½ÈİÆ÷  
+ * @brief ä»ç¼“å†²åŒºè¯»å–åˆ°å®¹å™¨
  * @details
- * ÉùÃ÷Îª`private`  
- * 
- * ÓÉ`Session::do_read`µ÷ÓÃ
- * 
- * @param error ²¶»ñµÄ´íÎó£¨Èç¹û·¢Éú´íÎó£©
- * @param length Êı¾İ³¤¶È
- * @param tag Êı¾İ½ÓÊÜÈİÆ÷
+ * å£°æ˜ä¸º`private`
+ *
+ * ç”±`Session::do_read`è°ƒç”¨
+ *
+ * @param error æ•è·çš„é”™è¯¯ï¼ˆå¦‚æœå‘ç”Ÿé”™è¯¯ï¼‰
+ * @param length æ•°æ®é•¿åº¦
+ * @param tag æ•°æ®æ¥å—å®¹å™¨
  */
-void Session::on_read(const asio::error_code& error, size_t length, string& tag){
-    if (!error){
+void Session::on_read(const asio::error_code &error, size_t length, string &tag)
+{
+    if (!error)
+    {
         istream is(&buffer_);
         getline(is, tag);
-    }else{
+    }
+    else
+    {
         cout << "error at Session::on_read:" << error.message() << endl;
     }
 };
 
-
-//·şÎñÆ÷Àà
-class Server{};
+// æœåŠ¡å™¨ç±»
+class Server
+{
+};
 
 // ====================================================
-// µÚËÄ²¿·Ö£ºÖ÷º¯Êı
+// ç¬¬å››éƒ¨åˆ†ï¼šä¸»å‡½æ•°
 // ====================================================
 
-void showWelcome() {
+void showWelcome()
+{
     cout << "=========================================" << endl;
-    cout << "      ¶·µØÖ÷ÓÎÏ·Âß¼­Óë·şÎñÆ÷ÏµÍ³        " << endl;
+    cout << "      æ–—åœ°ä¸»æ¸¸æˆé€»è¾‘ä¸æœåŠ¡å™¨ç³»ç»Ÿ        " << endl;
     cout << "=========================================" << endl;
     cout << endl;
-    cout << "ÏµÍ³°üº¬£º" << endl;
-    cout << "1. ÓÎÏ·Âß¼­Ä£¿é - ´¦Àí³öÅÆ¹æÔò¡¢ÅÆĞÍÅĞ¶Ï" << endl;
-    cout << "2. ÍøÂç·şÎñÆ÷Ä£¿é - »ùÓÚAsioµÄTCP·şÎñÆ÷" << endl;
+    cout << "ç³»ç»ŸåŒ…å«ï¼š" << endl;
+    cout << "1. æ¸¸æˆé€»è¾‘æ¨¡å— - å¤„ç†å‡ºç‰Œè§„åˆ™ã€ç‰Œå‹åˆ¤æ–­" << endl;
+    cout << "2. ç½‘ç»œæœåŠ¡å™¨æ¨¡å— - åŸºäºAsioçš„TCPæœåŠ¡å™¨" << endl;
     cout << endl;
-    cout << "±àÒëÃüÁî£ºg++ -std=c++11 -pthread main.cpp -o doudizhu" << endl;
+    cout << "ç¼–è¯‘å‘½ä»¤ï¼šg++ -std=c++11 -pthread main.cpp -o doudizhu" << endl;
     cout << "=========================================" << endl;
 }
 
-void showMenu() {
-    cout << "\n============ ¶·µØÖ÷ÏµÍ³Ö÷²Ëµ¥ ============" << endl;
-    cout << "1. Æô¶¯ÓÎÏ··şÎñÆ÷£¨¶Ë¿Ú8888£©" << endl;
-    cout << "2. Æô¶¯ÓÎÏ··şÎñÆ÷£¨×Ô¶¨Òå¶Ë¿Ú£©" << endl;
-    cout << "3. Í£Ö¹ÓÎÏ··şÎñÆ÷" << endl;
-    cout << "4. ²é¿´·şÎñÆ÷×´Ì¬" << endl;
-    cout << "5. ²âÊÔÓÎÏ·Âß¼­" << endl;
-    cout << "0. ÍË³ö³ÌĞò" << endl;
+void showMenu()
+{
+    cout << "\n============ æ–—åœ°ä¸»ç³»ç»Ÿä¸»èœå• ============" << endl;
+    cout << "1. å¯åŠ¨æ¸¸æˆæœåŠ¡å™¨ï¼ˆç«¯å£8888ï¼‰" << endl;
+    cout << "2. å¯åŠ¨æ¸¸æˆæœåŠ¡å™¨ï¼ˆè‡ªå®šä¹‰ç«¯å£ï¼‰" << endl;
+    cout << "3. åœæ­¢æ¸¸æˆæœåŠ¡å™¨" << endl;
+    cout << "4. æŸ¥çœ‹æœåŠ¡å™¨çŠ¶æ€" << endl;
+    cout << "5. æµ‹è¯•æ¸¸æˆé€»è¾‘" << endl;
+    cout << "0. é€€å‡ºç¨‹åº" << endl;
     cout << "=========================================" << endl;
-    cout << "ÇëÊäÈëÑ¡Ïî (0-5): ";
+    cout << "è¯·è¾“å…¥é€‰é¡¹ (0-5): ";
 }
 
-void testGameLogic() {
-    cout << "\n=== ÓÎÏ·Âß¼­²âÊÔ ===" << endl;
+void testGameLogic()
+{
+    cout << "\n=== æ¸¸æˆé€»è¾‘æµ‹è¯• ===" << endl;
 
-    // ²âÊÔÒ»Ğ©ÅÆĞÍ
+    // æµ‹è¯•ä¸€äº›ç‰Œå‹
     vector<Card> single = {Card(0)};
     vector<Card> pair = {Card(0), Card(13)};
     vector<Card> bomb = {Card(0), Card(13), Card(26), Card(39)};
 
-    cout << "²âÊÔÅÆĞÍÊ¶±ğ:" << endl;
-    GameLogic::printCards(single, "µ¥ÕÅ");
-    GameLogic::printCards(pair, "¶Ô×Ó");
-    GameLogic::printCards(bomb, "Õ¨µ¯");
+    cout << "æµ‹è¯•ç‰Œå‹è¯†åˆ«:" << endl;
+    GameLogic::printCards(single, "å•å¼ ");
+    GameLogic::printCards(pair, "å¯¹å­");
+    GameLogic::printCards(bomb, "ç‚¸å¼¹");
 
-    // ²âÊÔ·¢ÅÆ
-    cout << "\n²âÊÔ·¢ÅÆ¹¦ÄÜ:" << endl;
+    // æµ‹è¯•å‘ç‰Œ
+    cout << "\næµ‹è¯•å‘ç‰ŒåŠŸèƒ½:" << endl;
     auto cards = GameUtils::dealCards();
-    for(int i=0; i<3; i++) {
-        cout << "Íæ¼Ò" << (i+1) << " (" << cards[i].size() << "ÕÅ): ";
-        for(const auto& card : cards[i]) {
+    for (int i = 0; i < 3; i++)
+    {
+        cout << "ç©å®¶" << (i + 1) << " (" << cards[i].size() << "å¼ ): ";
+        for (const auto &card : cards[i])
+        {
             card.print();
             cout << " ";
         }
         cout << endl;
     }
 
-    cout << "\nÓÎÏ·Âß¼­²âÊÔÍê³É£¡" << endl;
+    cout << "\næ¸¸æˆé€»è¾‘æµ‹è¯•å®Œæˆï¼" << endl;
 }
 
-//»ØhuanµØÖ·127.0.0.1  8080  utf8±àÂë
-int main(){
+// å›huanåœ°å€127.0.0.1  8080  utf8ç¼–ç 
+int main()
+{
     return 0;
 };

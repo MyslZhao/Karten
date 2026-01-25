@@ -6,13 +6,13 @@
 ## 1. 等待其他玩家阶段
 此刻主界面`UI_MAIN`的`_surfunc`为`waiting_screen(pygame.Surface) -> None`  
 
-在从`welcome_screen`转为`waiting_screen`界面时会通过`SOCKET_MAIN`的`send`功能向服务器发送**一个字符串型数据**`1\n`，以声明该客户端玩家已准备进入游戏。  
+在从`welcome_screen`转为`waiting_screen`界面时会通过`SOCKET_MAIN`的`send`功能向服务器发送**一个字符串型数据**`1`，以声明该客户端玩家已准备进入游戏。  
 ```python
-SOCKET_MAIN.send('1\n') # 玩家进入准备阶段
+SOCKET_MAIN.send('1') # 玩家进入准备阶段
 ```
-同时，玩家在等待其他玩家准备期间亦可通过`waiting_screen`上的`return_button`回到`welcome_screen`，同时会向服务器发送**一个字符串型数据**`0\n`，以声明该客户端玩家退出准备阶段。  
+同时，玩家在等待其他玩家准备期间亦可通过`waiting_screen`上的`return_button`回到`welcome_screen`，同时会向服务器发送**一个字符串型数据**`0`，以声明该客户端玩家退出准备阶段。  
 ```python
-SOCKET_MAIN.send('0\n') # 玩家退出准备阶段
+SOCKET_MAIN.send('0') # 玩家退出准备阶段
 ```
 ## 2. 叫、抢地主阶段
 ## 4. 出牌阶段

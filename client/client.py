@@ -4,6 +4,7 @@ import threading
 import sys
 from typing import Tuple, Callable, Any
 from abc import ABC, abstractmethod
+from time import sleep
 import os
 # -*- encoding: utf-8 -*-
 # 用“待”标明TODO事项
@@ -474,7 +475,7 @@ class ImageObjectFactory(InteractorAreaFactory):
         return ImageObject(image)
 #---------------------------------------------------------------------------UI界面设计------------------------------------------------------------------------------
 
-def welcome_screen(surface: pygame.Surface) -> None:
+def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
     """
     欢迎界面
     
@@ -487,8 +488,10 @@ def welcome_screen(surface: pygame.Surface) -> None:
         """
         start_button绑定的方法
         """
+        sk_main.send("1")
         UI_MAIN.switch_surfunc(waiting_screen)
         # 待添加socket交互
+        
         pass
         
     WELCOME_BG = pygame.image.load("src\\bg\\welcome_bg.jpg")
@@ -505,7 +508,7 @@ def welcome_screen(surface: pygame.Surface) -> None:
     start_button.run(surface)
     # surface.fill((255, 255, 255))
     
-def waiting_screen(surface : pygame.Surface):
+def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
     """
     等待连接界面
     
@@ -518,6 +521,7 @@ def waiting_screen(surface : pygame.Surface):
         return_button绑定的方法
         """
         UI_MAIN.switch_surfunc(welcome_screen)
+        sk_main.send("0")
         
     WELCOME_BG = pygame.image.load("src\\bg\\welcome_bg.jpg")
     
@@ -531,6 +535,9 @@ def waiting_screen(surface : pygame.Surface):
     return_button = BUTTONFACTORY.construct((520, 360), (240, 60), "返回", border_width = 1, text_font = "src\\fonts\\MicrosoftYaHei.ttf")
     return_button.bind(return_buttons_job)
     return_button.run(surface)
+    
+    # socket接受处理阶段
+    
     
 
 def game_screen(surface: pygame.Surface):
@@ -561,30 +568,30 @@ class UIMain():
     存有线程ui_thread负责的ui主程序，主管ui绘制
     """
     
-    def __init__(self, start_surfunc : Callable[[pygame.Surface], None]):
+    def __init__(self, start_surfunc : Callable[[pygame.Surface, "SocketMain"], None]):
         """
         用一个界面方法初始化一个UIMain对象
         
         :param start_surfunc: 初始界面((pygame.Surface) -> None)
         :type start_surfunc: Callable[[pygame.Surface], None]
         """
-        self._surfunc : Callable[[pygame.Surface], None] = start_surfunc
+        self._surfunc : Callable[[pygame.Surface, SocketMain], None] = start_surfunc
         
-    def switch_surfunc(self, new_surfunc : Callable[[pygame.Surface], None]) -> None:
+    def switch_surfunc(self, new_surfunc : Callable[[pygame.Surface, "SocketMain"], None]) -> None:
         """
         切换界面方法
         
         :param new_surfunc: 新的界面((pygame.Surface) -> None)
         :type new_surfunc: Callable[[pygame.Surface], None]
         """
-        self._surfunc : Callable[[pygame.Surface], None] = new_surfunc
+        self._surfunc : Callable[[pygame.Surface, SocketMain], None] = new_surfunc
         
     def _run(self):
         """
         UIMain主要运行逻辑  
         
         """
-        global RUNNING
+        global RUNNING, SOCKET_MAIN
         
         pygame.font.init()
         pygame.init()
@@ -611,7 +618,7 @@ class UIMain():
                 pygame.display.flip()
                 
                 # ui 绘制 start
-                self._surfunc(screen)
+                self._surfunc(screen, SOCKET_MAIN)
                 # ui 绘制 end
                 
                 clock.tick(120)
@@ -667,10 +674,30 @@ class SocketMain():
                 continue
         self._listenflag = 0
     
-    def recv(self) -> str:
-        if self._listenmsg == []:
-            return ""
-        return self._listenmsg.pop(0)
+    def recv(self, t: int = 1) -> str:
+        """使用事件机制等待消息"""
+        # 如果已经有消息，直接返回
+        if self._listenmsg:
+            return self._listenmsg.pop(0)
+        
+        # 创建一个事件对象
+        msg_event = threading.Event()
+        
+        # 定时器线程：t秒后触发事件
+        def timer():
+            sleep(t)
+            msg_event.set()
+        
+        timer_thread = threading.Thread(target=timer, daemon=True)
+        timer_thread.start()
+        
+        # 等待事件被触发（有消息到达或超时）
+        msg_event.wait()
+        
+        # 检查是否有消息
+        if self._listenmsg:
+            return self._listenmsg.pop(0)
+        return ""
         
     def send(self, msg : str) -> None:
         self._sendmsg.append(msg)
@@ -704,6 +731,15 @@ class SocketMain():
         
 SOCKET_MAIN = SocketMain(TESTADDR)
 SOCKET_MAIN.start()
+
+connect_status = SOCKET_MAIN.recv()
+if connect_status == "":
+    print("连接超时")
+    sys.exit(0)
+if connect_status == "failed":
+    print("连接已满")
+    sys.exit(0)
+
 UI_MAIN = UIMain(welcome_screen)
 UI_MAIN.start()
 

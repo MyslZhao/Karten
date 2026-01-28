@@ -17,9 +17,11 @@ import socket
 import threading
 import sys
 from dataclasses import dataclass
-from typing import Tuple, Callable, Any
+from typing import Tuple, Callable, Any, Optional
 from abc import ABCMeta, abstractmethod
 from time import sleep
+from collections import deque
+import asyncio
 import os
 import pygame
 # -*- encoding: utf-8 -*-
@@ -372,7 +374,7 @@ class Button(InteractorArea):
         self._frame = button_rect
         self.color = button_color
         self.border_width = border.width
-        self.border_color = tuple(Border.color)
+        self.border_color = tuple(border.color)
         self._content = text
         self._func = lambda : print("clicked")
 
@@ -543,7 +545,7 @@ def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
         """
         start_button绑定的方法
         """
-        sk_main.send("1")
+        asyncio.run(sk_main.send("1"))
         UI_MAIN.switch_surfunc(waiting_screen)
         # 待添加socket交互
 
@@ -593,7 +595,7 @@ def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
         return_button绑定的方法
         """
         UI_MAIN.switch_surfunc(welcome_screen)
-        sk_main.send("0")
+        asyncio.run(sk_main.send("0"))
 
     welcome_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
 
@@ -678,7 +680,7 @@ class UIMain():
         """
         self._surfunc : Callable[[pygame.Surface, SocketMain], None] = new_surfunc
 
-    def _run(self):
+    async def _run(self) -> None:
         """
         UIMain主要运行逻辑
 
@@ -702,7 +704,6 @@ class UIMain():
                             RUNNING = False
                     # 可选：处理窗口大小变化等其他事件
 
-                # 如果窗口被强制关闭（某些系统可能不发送QUIT事件）
                 if not pygame.display.get_init():
                     RUNNING = False
 
@@ -710,24 +711,25 @@ class UIMain():
                 pygame.display.flip()
 
                 # ui 绘制 start
-                self._surfunc(screen, SOCKET_MAIN)
+                if self._surfunc and SOCKET_MAIN:
+                    self._surfunc(screen, SOCKET_MAIN)
                 # ui 绘制 end
 
-                clock.tick(120)
+                await asyncio.sleep(0)
+                clock.tick(60)
 
-        except Exception as e:
+        except KeyboardInterrupt as e:
             print(f"程序异常: {e}")
         finally:
             # 确保资源被正确释放
             pygame.quit()
 
-    def start(self):
+    async def start(self) -> None:
         """
-        将self._run交给单独的线程运行
+        转入self._run运行
 
         """
-        ui_thread = threading.Thread(target = self._run, name = "UI thread")
-        ui_thread.start()
+        await self._run()
 
 class SocketMain():
     """
@@ -735,69 +737,100 @@ class SocketMain():
     """
     def __init__(self, addr : Tuple[str, int]): #初始化逻辑待完善
         self._addr = addr
-        self._listenmsg = []
-        self._sendmsg = []
-        self._flag = 0
-        self._listenflag = 1
-        self._sendflag = 1
-        self._socket = socket.socket()
+        self._listenmsg = asyncio.Queue()
+        self._sendmsg = asyncio.Queue()
+        self._running = False
+        self._reader : Optional[asyncio.StreamReader] = None
+        self._writer : Optional[asyncio.StreamWriter] = None
+        self._socket : Optional[socket.socket] = None
 
-    def _send(self) -> None:
-        while True:
+    async def _connect(self) -> bool:
+        """
+        异步连接
+
+        """
+        loop = asyncio.get_event_loop()
+
+        try:
+            self._socket = socket.socket()
+            self._socket.setblocking(False)
+
+            await asyncio.wait_for(
+                loop.sock_connect(self._socket, self._addr),
+                timeout = 5
+                )
+
+            return True
+
+        except (ConnectionError, OSError, asyncio.TimeoutError):
+            if self._socket:
+                self._socket.close()
+                self._socket = None
+            return False
+
+    async def _send(self) -> None:
+        """
+        发送协程
+
+        """
+        loop = asyncio.get_event_loop()
+
+        while self._running:
             try:
-                if self._flag:
-                    break
-                if not self._sendmsg:
-                    continue
-                if self._flag:
-                    break
-                if not RUNNING:
-                    self._flag = 1
-                self._socket.sendall(self._sendmsg.pop(0).encode("utf-8"))
-            except BaseException:
-                self._flag = 1
-                continue
-        self._sendflag = 0
+                msg = await self._sendmsg.get()
 
-    def _listen(self) -> None:
-        while True:
+                if self._socket:
+                    await loop.sock_sendall(self._socket, msg.encode("utf-8"))
+                self._sendmsg.task_done()
+
+            except (ConnectionError, OSError):
+                self._running = False
+                break
+            except asyncio.CancelledError:
+                break
+
+    async def _listen(self) -> None:
+        """
+        监听协程
+
+        """
+        loop = asyncio.get_event_loop()
+
+        while self._running and self._socket:
             try:
-                if self._flag:
-                    break
-                cache = self._socket.recv(2048).decode("utf-8")
-                if cache is not None:
-                    self._listenmsg.append(cache)
-            except BaseException:
-                self._flag = 1
-                continue
-        self._listenflag = 0
+                if self._socket:
+                    data = await loop.sock_recv(self._socket, 2048)
 
-    def recv(self, t: int = 1) -> str:
-        """使用事件机制等待消息"""
-        # 如果已经有消息，直接返回
-        if self._listenmsg:
-            return self._listenmsg.pop(0)
+                    if data:
+                        message = data.decode("utf-8")
+                        await self._listenmsg.put(message)
 
-        # 创建一个事件对象
-        msg_event = threading.Event()
+            except (ConnectionError, OSError):
+                self._running = False
+                break
+            except asyncio.CancelledError:
+                break
 
-        # 定时器线程：t秒后触发事件
-        def timer():
-            sleep(t)
-            msg_event.set()
+    async def recv(self, t: int = 1) -> str:
+        """
+        从接受消息队列读取消息
 
-        timer_thread = threading.Thread(target=timer, daemon=True)
-        timer_thread.start()
+        :param t: 接受时限(默认1s)
+        :type t: int
+        :return: 接受到的消息
+        :rtype: str
+        """
+        try:
+            msg = await asyncio.wait_for(
+                self._listenmsg.get(),
+                timeout = t
+            )
+            return msg
 
-        # 等待事件被触发（有消息到达或超时）
-        msg_event.wait()
+        except asyncio.TimeoutError:
+            return ""
 
-        # 检查是否有消息
-        if self._listenmsg:
-            return self._listenmsg.pop(0)
-        return ""
-
-    def send(self, msg : str) -> None:
+    async def send(self, msg : str) -> None:
         """
         发送消息，
         将消息送入发送序列
@@ -805,53 +838,78 @@ class SocketMain():
         :param msg: 要发送的消息
         :type msg: str
         """
-        self._sendmsg.append(msg)
+        await self._sendmsg.put(msg)
 
-    def start(self) -> None:
-        """
-        将self._run交给单独的线程运行
-
-        """
-        self._socket.connect(self._addr)
-
-        listen_thread = threading.Thread(target = self._listen, name = "listen thread")
-        send_thread = threading.Thread(target = self._send, name = "send thread")
-        lifemanager_thread = threading.Thread(target = self.isalive, name = "life_manager")
-        listen_thread.start()
-        send_thread.start()
-        lifemanager_thread.start()
-
-    def isalive(self):
+    async def isalive(self):
         """
         管理listen_thread和send_thread生命周期的函数
         交由lifemanager_thread管理
 
         """
-        global RUNNING, SOCKETRUNNING
-        while True:
+        while self._running:
+            await asyncio.sleep(0.1)
+
             if not RUNNING:
-                self._flag = 1
+                self._running = False
                 break
-        while True:
-            if not self._sendflag:
-                SOCKETRUNNING = False
+
+    async def _run(self) -> None:
+        """
+        客户端游戏逻辑的socket线程
+
+        """
+        await self._connect()
+
+        send_task = asyncio.create_task(self._send())
+        listen_task = asyncio.create_task(self._listen())
+        life_task = asyncio.create_task(self.isalive())
+
+        try:
+            await asyncio.gather(send_task, listen_task, life_task)
+        except asyncio.CancelledError:
+            send_task.cancel()
+            listen_task.cancel()
+            life_task.cancel()
+
+            await asyncio.gather(
+                send_task, listen_task, life_task,
+                return_exceptions = True
+                )
+
+            # 进入游戏阶段
+            connect_status = SOCKET_MAIN.recv()
+            if connect_status == "":
+                print("连接超时")
+                sys.exit(0)
+            if connect_status == "failed":
+                print("连接已满")
+                sys.exit(0)
+        finally:
+            if self._socket:
                 self._socket.close()
-                break
+
+    async def start(self) -> asyncio.Task:
+        """
+        转入self._run运行
+
+        """
+        return asyncio.create_task(self._run())
+
+    def close(self) -> None:
+        """
+        关闭连接
+
+        """
+        self._running = False
+
 
 SOCKET_MAIN = SocketMain(TESTADDR)
-SOCKET_MAIN.start()
-
-connect_status = SOCKET_MAIN.recv()
-if connect_status == "":
-    print("连接超时")
-    sys.exit(0)
-if connect_status == "failed":
-    print("连接已满")
-    sys.exit(0)
-
 UI_MAIN = UIMain(welcome_screen)
-UI_MAIN.start()
 
-while True:
-    if not RUNNING and not SOCKETRUNNING:
-        break
+async def main():
+    """
+    并发式主函数
+    """
+    await asyncio.gather(SOCKET_MAIN.start(), UI_MAIN.start())
+
+asyncio.run(main())

@@ -13,6 +13,11 @@
 # + R0903:类的公共方法太少(小于2)。
 # + W0603:使用了global关键字，pylint不鼓励使用任何的global关键字以在函数内部更改全局变量。
 # + W0718:过于宽松的except异常捕获。
+
+# TODO: add logger
+# TODO: apply 'Text' dataclass
+# TODO: interface with server
+
 import socket
 import threading
 import sys
@@ -21,11 +26,11 @@ from typing import Tuple, Callable, Any, Optional
 from abc import ABCMeta, abstractmethod
 from time import sleep
 from collections import deque
+from datetime import datetime
 import asyncio
 import os
 import pygame
 # -*- encoding: utf-8 -*-
-# 用“待”标明TODO事项
 CARD_QUEUE = []
 
 # 运行路径初始化
@@ -34,6 +39,26 @@ if getattr(sys, 'frozen', False):
 else:
     application_path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(application_path)
+
+def logger(msg : str, t : str = "INFO", thread : str = "main", pipe : str = "file"):
+    """
+    客户端日志接口
+
+    :param msg: 消息内容
+    :type msg: str
+    :param t: 消息等级(规定为INFO, TRACE, WARN, ERROR四种等级)
+    :type t: str
+    :param thread: 日志线程
+    :type thread: str
+    :param pipe: 日志输出管道(规定为cmd, file两种)
+    :type pipe: str
+    """
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if pipe == "cmd":
+        print(timestamp + f" [{thread}] {t} {msg}")
+    elif pipe == "file":
+        with open("client.log", "a") as f:
+            f.write(timestamp + f" [{thread}] {t} {msg}\r\n")
 
 # 数据描述类
 @dataclass
@@ -545,7 +570,7 @@ def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
         """
         start_button绑定的方法
         """
-        asyncio.run(sk_main.send("1"))
+        asyncio.create_task(sk_main.send("1"))
         UI_MAIN.switch_surfunc(waiting_screen)
         # 待添加socket交互
 
@@ -595,7 +620,7 @@ def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
         return_button绑定的方法
         """
         UI_MAIN.switch_surfunc(welcome_screen)
-        asyncio.run(sk_main.send("0"))
+        asyncio.create_task(sk_main.send("0"))
 
     welcome_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
 
@@ -773,20 +798,27 @@ class SocketMain():
         发送协程
 
         """
+        logger("Send tasks starts", thread = "send_task/self._send")
         loop = asyncio.get_event_loop()
 
+        logger("Entering loop.", thread = "send_task/self._send")
         while self._running:
             try:
                 msg = await self._sendmsg.get()
-
+                logger(f"Message '{msg}' ready to be sent.", t = "TRACE", thread = "send_task/self._send")
+                
                 if self._socket:
                     await loop.sock_sendall(self._socket, msg.encode("utf-8"))
+                    logger(f"Message {msg} has been sent.", t = "TRACE", thread = "send_task/self._send")
+                    
                 self._sendmsg.task_done()
 
-            except (ConnectionError, OSError):
+            except (ConnectionError, OSError) as e:
+                logger(str(e), t = "ERROR", thread = "send_task/self._send")
                 self._running = False
                 break
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
+                logger(f"Tasks cancelled : {e}", t = "WARN", thread = "send_task/self._send")
                 break
 
     async def _listen(self) -> None:
@@ -794,8 +826,10 @@ class SocketMain():
         监听协程
 
         """
+        logger("Listen task starts", thread = "listen_task/self._listen")
         loop = asyncio.get_event_loop()
 
+        logger("Entering loop.", thread = "listen_task/self._listen")
         while self._running and self._socket:
             try:
                 if self._socket:
@@ -858,42 +892,55 @@ class SocketMain():
         客户端游戏逻辑的socket线程
 
         """
-        await self._connect()
+        logger("Game task starts.", thread = "game_task/self._run")
+        
+        connect_status = self.recv()
+        if connect_status == "":
+            logger("连接超时", thread = "game_task/self._run")
+            sys.exit(0)
+        if connect_status == "failed":
+            logger("连接已满", thread = "game_task/self._run")
+            sys.exit(0)
+        
 
+    async def start(self) -> None:
+        """
+        socket总逻辑管理
+
+        """
+        logger("Socket starts", thread = "SOCKET_MAIN")
+        
+        await self._connect()
+        logger("Connection established.", thread = "SOCKET_MAIN")
+        
         send_task = asyncio.create_task(self._send())
         listen_task = asyncio.create_task(self._listen())
+        game_task = asyncio.create_task(self._run())
         life_task = asyncio.create_task(self.isalive())
-
+        
         try:
-            await asyncio.gather(send_task, listen_task, life_task)
-        except asyncio.CancelledError:
+            logger("All socket tasks started.", thread = "SOCKET_MAIN")
+            await asyncio.gather(send_task, listen_task, life_task, game_task)
+            
+        except asyncio.CancelledError as e:
+            logger(str(e), t = "ERROR", thread = "SOCKET_MAIN")
+            
+            game_task.cancel()
             send_task.cancel()
             listen_task.cancel()
             life_task.cancel()
-
+            
+            logger("Waiting all tasks free.", t = "TRACE", thread = "SOCKET_MAIN")
             await asyncio.gather(
-                send_task, listen_task, life_task,
+                game_task, send_task, listen_task, life_task,
                 return_exceptions = True
                 )
 
-            # 进入游戏阶段
-            connect_status = SOCKET_MAIN.recv()
-            if connect_status == "":
-                print("连接超时")
-                sys.exit(0)
-            if connect_status == "failed":
-                print("连接已满")
-                sys.exit(0)
         finally:
             if self._socket:
                 self._socket.close()
+            logger("Socket close, SOCKET_MAIN finished!", thread = "SOCKET_MAIN")
 
-    async def start(self) -> asyncio.Task:
-        """
-        转入self._run运行
-
-        """
-        return asyncio.create_task(self._run())
 
     def close(self) -> None:
         """
@@ -910,6 +957,7 @@ async def main():
     """
     并发式主函数
     """
+    logger("Client starts.")
     await asyncio.gather(SOCKET_MAIN.start(), UI_MAIN.start())
 
 asyncio.run(main())

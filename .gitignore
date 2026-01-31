@@ -4,6 +4,7 @@ client/.venv/
 client/test_server.py
 server/.venv/
 server/__pycache__/   
+*.log
 *.pyc
 *.pyo
 *.pyd

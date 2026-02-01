@@ -14,12 +14,9 @@
 # + W0603:使用了global关键字，pylint不鼓励使用任何的global关键字以在函数内部更改全局变量。
 # + W0718:过于宽松的except异常捕获。
 
-# TODO: add logger
-# TODO: apply 'Text' dataclass
 # TODO: interface with server
 
 import socket
-import threading
 import sys
 from dataclasses import dataclass
 from typing import Tuple, Callable, Any, Optional
@@ -58,7 +55,7 @@ def logger(msg : str, t : str = "INFO", thread : str = "main", pipe : str = "fil
         print(timestamp + f" [{thread}] {t} {msg}")
     elif pipe == "file":
         with open("client.log", "a") as f:
-            f.write(timestamp + f" [{thread}] {t} {msg}\r\n")
+            f.write(timestamp + f" [{thread}] {t} {msg}\n")
 
 # 数据描述类
 @dataclass
@@ -94,9 +91,9 @@ class Text: # 待应用
     基础文本描述类
     """
     text : str
-    font : pygame.font.Font
+    font : str|None
     size : int
-    color : Color
+    color : Color = Color(0, 0, 0)
 
 @dataclass
 class Border:
@@ -274,12 +271,9 @@ class LabelFactory(DisplayAreaFactory):
     自定义组件Label的工厂类
     """
     def construct(self,
-                 text : str,
+                 text : Text,
                  start_pos : Tuple[float, float],
                  size : Tuple[float, float],
-                 text_font : str|None = None,
-                 text_size : int = 18,
-                 text_color : Tuple[int, int, int] = (0, 0, 0),
                  bg_apparent : bool = False,
                  bg_color : Tuple[int, int, int] = (255, 255, 255),
                  border : Border = Border(Color(255, 255, 255), 0),
@@ -289,18 +283,12 @@ class LabelFactory(DisplayAreaFactory):
         构建一个Label对象
         预处理相关零散数据，包装为Label初始化所需的参数
 
-        :param text: Label文本内容
+        :param text: Text数据包
         :type text: str
         :param start_pos: Label左上角像素坐标
         :type start_pos: Tuple[float, float]
         :param size: Label的长和宽
         :type size: Tuple[float, float]
-        :param text_font: Label文本字体
-        :type text_font: str | None
-        :param text_size: Label文本大小
-        :type text_size: int
-        :param text_color: Label文本颜色
-        :type text_color: Tuple[int, int, int]
         :param bg_apparent: Label背景透明化
         :type bg_apparent: bool
         :param bg_color: Label背景颜色
@@ -313,8 +301,8 @@ class LabelFactory(DisplayAreaFactory):
         :rtype: Label
         """
         text_rect = pygame.Rect(start_pos[0], start_pos[1], size[0], size[1])
-        text_obj = pygame.font.Font(text_font, text_size)
-        text_surface = text_obj.render(text, antialias, text_color)
+        text_obj = pygame.font.Font(text.font, text.size)
+        text_surface = text_obj.render(text.text, antialias, tuple(text.color))
         return Label(text_surface, text_rect, bg_apparent, bg_color, border)
 
 
@@ -495,12 +483,9 @@ class ButtonFactory(InteractorAreaFactory):
     def construct(self,
                   start_pos : Tuple[float, float],
                   size : Tuple[float, float],
-                  text : str = "",
+                  text : Text = Text("", None, 18),
                   button_color : Tuple[int, int, int] = (255, 255, 255),
                   border : Border = Border(Color(0, 0, 0), 0),
-                  text_color : Tuple[int, int, int] = (0, 0, 0),
-                  text_font : str|None = None,
-                  text_size : int = 18,
                   antialias : bool = True #启用字体平滑
                   ) -> Button:
         """
@@ -511,18 +496,12 @@ class ButtonFactory(InteractorAreaFactory):
         :type start_pos: Tuple[float, float]
         :param size: Button的长和宽
         :type size: Tuple[float, float]
+        :param text: Text数据包
+        :type text: Text
         :param button_color: Button的颜色
         :type button_color: Tuple[int, int, int]
         :param border: 边框数据包
         :type border: Border
-        :param text_color: Button文本颜色
-        :type text_color: Tuple[int, int, int]
-        :param text_font: Button文本字体
-        :type text_font: str | None
-        :param text_size: Button文本大小
-        :type text_size: int
-        :param text: Button文本内容
-        :type text: str
         :param antialias: Button文本平滑
         :type antialias: bool
         :return: Button对象
@@ -531,8 +510,8 @@ class ButtonFactory(InteractorAreaFactory):
         button_rect = pygame.Rect(start_pos[0], start_pos[1], size[0], size[1])
         if text is None:
             return Button(button_rect, button_color, border, None)
-        text_obj = pygame.font.Font(text_font, text_size)
-        button_text = text_obj.render(text, antialias, text_color)
+        text_obj = pygame.font.Font(text.font, text.size)
+        button_text = text_obj.render(text.text, antialias, tuple(text.color))
         return Button(button_rect, button_color, border, button_text)
 
 class ImageObjectFactory(InteractorAreaFactory):
@@ -566,6 +545,7 @@ def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
     """
     global RUNNING, UI_MAIN
 
+    logger("Rendering welcome_screen.", t = "TRACE", thread = "welcome_screen/self._surfunc")
     def start_buttons_job():
         """
         start_button绑定的方法
@@ -588,20 +568,23 @@ def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
                                          )
     start_board.run(surface)
 
-    start_text = LABELFACTORY.construct("斗地主",
+    start_text = LABELFACTORY.construct(Text("斗地主",
+                                             "src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf",
+                                             70
+                                             ),
                                        (400, 200),
                                        (480, 120),
-                                       text_size = 70,
-                                       bg_apparent = True,
-                                       text_font = "src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf"
+                                       bg_apparent = True
                                        )
     start_text.run(surface)
 
     start_button = BUTTONFACTORY.construct((520, 360),
                                            (240, 60),
-                                           "开始",
-                                           border = Border(Color(0, 0, 0), 1),
-                                           text_font = "src\\fonts\\MicrosoftYaHei.ttf"
+                                           Text("开始",
+                                                "src\\fonts\\MicrosoftYaHei.ttf",
+                                                18
+                                                ),
+                                           border = Border(Color(0, 0, 0), 1)
                                            )
     start_button.bind(start_buttons_job)
     start_button.run(surface)
@@ -615,6 +598,8 @@ def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
     :type surface: pygame.Surface
     """
     global UI_MAIN, RUNNING
+    logger("Rendering waiting_screen.", t = "TRACE", thread = "waiting_screen/self._surfunc")
+    
     def return_buttons_job():
         """
         return_button绑定的方法
@@ -636,21 +621,24 @@ def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
                                            )
     waiting_board.run(surface)
 
-    waiting_text = LABELFACTORY.construct("等待其他玩家...",
-                                         (400, 200),
-                                         (480, 120),
-                                         text_size = 70,
-                                         bg_apparent = True,
-                                         border = Border(Color(255, 255, 255), 0),
-                                         text_font = "src\\fonts\\MicrosoftYaHei.ttf"
-                                         )
+    waiting_text = LABELFACTORY.construct(Text("等待其他玩家...",
+                                               "src\\fonts\\MicrosoftYaHei.ttf",
+                                               70
+                                               ),
+                                          (400, 200),
+                                          (480, 120),
+                                          bg_apparent = True,
+                                          border = Border(Color(255, 255, 255), 1)
+                                          )
     waiting_text.run(surface)
 
     return_button = BUTTONFACTORY.construct((520, 360),
                                             (240, 60),
-                                            "返回",
-                                            border = Border(Color(255, 255, 255), 1),
-                                            text_font = "src\\fonts\\MicrosoftYaHei.ttf"
+                                            Text("返回",
+                                                 "src\\fonts\\MicrosoftYaHei.ttf",
+                                                 18
+                                                 ),
+                                            border = Border(Color(255, 255, 255), 1)
                                             )
     return_button.bind(return_buttons_job)
     return_button.run(surface)
@@ -717,7 +705,8 @@ class UIMain():
         screen = pygame.display.set_mode((1280, 720))
         pygame.display.set_caption("斗地主")
         clock = pygame.time.Clock()
-
+        
+        logger("Entering render loop", thread = "UI_MAIN")
         try:
             while RUNNING:
                 events = pygame.event.get()
@@ -754,6 +743,7 @@ class UIMain():
         转入self._run运行
 
         """
+        logger("UI starts", t = "", thread = "UI_MAIN")
         await self._run()
 
 class SocketMain():
@@ -769,28 +759,37 @@ class SocketMain():
         self._writer : Optional[asyncio.StreamWriter] = None
         self._socket : Optional[socket.socket] = None
 
-    async def _connect(self) -> bool:
+    async def _connect(self, timeout: float = 2.0) -> bool:
         """
         异步连接
-
         """
-        loop = asyncio.get_event_loop()
-
+        logger("Start connect tasks.", thread="lambda/self._connect")
+        
         try:
             self._socket = socket.socket()
             self._socket.setblocking(False)
-
+            
+            # 设置局域网优化选项
+            self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # 禁用Nagle算法
+            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)  # 启用保活
+            
+            logger("Connecting...", thread="lambda/self._connect")
             await asyncio.wait_for(
-                loop.sock_connect(self._socket, self._addr),
-                timeout = 5
-                )
-
+                asyncio.get_running_loop().sock_connect(self._socket, self._addr),
+                timeout=timeout  # 使用参数化的超时时间
+            )
+            
             return True
-
-        except (ConnectionError, OSError, asyncio.TimeoutError):
+            
+        except (ConnectionError, OSError, asyncio.TimeoutError) as e:
+            logger(f"Connection failed: {e}", thread="lambda/self._connect")
             if self._socket:
-                self._socket.close()
-                self._socket = None
+                try:
+                    self._socket.close()
+                except OSError:
+                    pass  # 忽略关闭时的错误
+                finally:
+                    self._socket = None
             return False
 
     async def _send(self) -> None:
@@ -834,15 +833,18 @@ class SocketMain():
             try:
                 if self._socket:
                     data = await loop.sock_recv(self._socket, 2048)
-
                     if data:
                         message = data.decode("utf-8")
+                        logger(f"One message received:{data.decode}", t = "TRACE", thread = "listen_task/self._listen")
+                        
                         await self._listenmsg.put(message)
 
-            except (ConnectionError, OSError):
+            except (ConnectionError, OSError) as e:
+                logger(str(e), t = "ERROR", thread = "listen_task/self._listen")
                 self._running = False
                 break
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as e:
+                logger(f"Tasks cancelled : {e}", t = "WARN", thread = "send_task/self._send")
                 break
 
     async def recv(self, t: int = 1) -> str:
@@ -880,10 +882,12 @@ class SocketMain():
         交由lifemanager_thread管理
 
         """
+        logger("life manager task starts.", thread = "life_task/self.isalive")
         while self._running:
             await asyncio.sleep(0.1)
 
             if not RUNNING:
+                logger("Stop RUNNING!", t = "TRACE", thread = "life_task/self.isalive")
                 self._running = False
                 break
 
@@ -894,14 +898,18 @@ class SocketMain():
         """
         logger("Game task starts.", thread = "game_task/self._run")
         
-        connect_status = self.recv()
+        connect_status = await self.recv()
         if connect_status == "":
-            logger("连接超时", thread = "game_task/self._run")
-            sys.exit(0)
+            logger("Connection timeout.", t = "WARN", thread = "game_task/self._run")
+            return
         if connect_status == "failed":
-            logger("连接已满", thread = "game_task/self._run")
-            sys.exit(0)
-        
+            logger("Connection already full.", t = "WARN", thread = "game_task/self._run")
+            return
+        logger("Connected successfully.", thread = "game_task/self._run")
+        try:
+            input("self._run debug,enter to finish task")
+        except BaseException:
+            pass
 
     async def start(self) -> None:
         """

@@ -19,7 +19,7 @@
 import socket
 import sys
 from dataclasses import dataclass
-from typing import Tuple, Callable, Any, Optional
+from typing import Tuple, Callable, Any, Optional, List
 from abc import ABCMeta, abstractmethod
 from time import sleep
 from collections import deque
@@ -28,7 +28,8 @@ import asyncio
 import os
 import pygame
 # -*- encoding: utf-8 -*-
-CARD_QUEUE = []
+ID = 0
+CARD_QUEUE : List[Optional[Tuple[int, int]]]= []
 
 # 运行路径初始化
 if getattr(sys, 'frozen', False):
@@ -55,7 +56,10 @@ def logger(msg : str, t : str = "INFO", thread : str = "main", pipe : str = "fil
         print(timestamp + f" [{thread}] {t} {msg}")
     elif pipe == "file":
         with open("client.log", "a") as f:
-            f.write(timestamp + f" [{thread}] {t} {msg}\n")
+            if msg == "":
+                f.write("\n")
+            else:
+                f.write(timestamp + f" [{thread}] {t} {msg}\n")
 
 # 数据描述类
 @dataclass
@@ -86,7 +90,7 @@ class Color:
         return iter([self.r, self.g, self.b])
 
 @dataclass
-class Text: # 待应用
+class Text:
     """
     基础文本描述类
     """
@@ -110,6 +114,7 @@ class DisplayArea(metaclass = ABCMeta):
     """
     _content : Any = None
     _frame : pygame.Rect
+    _displayed : bool = False
 
     @abstractmethod
     def _display(self, surface : pygame.Surface) -> None:...
@@ -122,7 +127,9 @@ class DisplayArea(metaclass = ABCMeta):
         :type surface: pygame.Surface
         """
         self._display(surface)
-        pygame.display.flip()
+        if not self._displayed:
+            pygame.display.flip()
+            self._displayed = True
 
 class Board(DisplayArea):
     """
@@ -305,7 +312,6 @@ class LabelFactory(DisplayAreaFactory):
         text_surface = text_obj.render(text.text, antialias, tuple(text.color))
         return Label(text_surface, text_rect, bg_apparent, bg_color, border)
 
-
 # UI控件
 class InteractorArea(metaclass = ABCMeta):
     """
@@ -314,6 +320,8 @@ class InteractorArea(metaclass = ABCMeta):
     _frame = None
     _content = None
     _func = None
+    _displayed : bool = False
+    _surface : Optional[pygame.Surface] = None
 
     @abstractmethod
     def _display(self, surface : pygame.Surface) -> None:...
@@ -347,17 +355,19 @@ class InteractorArea(metaclass = ABCMeta):
         """
         global RUNNING
         self._display(surface)
-        pygame.display.flip()
+        if not self._displayed:
+            pygame.display.flip()
+            self._displayed = True
         if self._handle() == -1:
             RUNNING = False
 
-    def bind(self, job : Callable[[], None]) -> None:
+    def bind(self, job : Callable[["InteractorArea"], None]) -> None:
         """
         将组件与Func绑定
-        规定func为无参数无返回值类型
+        规定func为有self类型参数无返回值类型
 
         :param job: 绑定的方法
-        :type job: function
+        :type job: Callable[["InteractorArea"], None]
         """
         self._func = job
 
@@ -389,7 +399,7 @@ class Button(InteractorArea):
         self.border_width = border.width
         self.border_color = tuple(border.color)
         self._content = text
-        self._func = lambda : print("clicked")
+        self._func = None
 
     def _events(self, event: pygame.event.Event):
         """
@@ -399,8 +409,8 @@ class Button(InteractorArea):
         :type event: pygame.event
         """
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if self._frame.collidepoint(event.pos):
-                self._func()
+            if self._frame.collidepoint(event.pos) and self._func:
+                self._func(self)
                 return 1
         return 0
 
@@ -420,42 +430,128 @@ class Button(InteractorArea):
                           self._frame.centery - self._content.get_height() // 2)
                          )
 
-class ImageObject(InteractorArea):
+class CardImageObject(InteractorArea):
     """
-    图片交互对象
+    增强版图片交互对象（整合了test.py的CardImageObject功能）
     """
     def __init__(self,
-                 image : pygame.Surface
+                 image: pygame.Surface,
+                 id: Tuple[int, int],
+                 pos: Coord
                  ):
         """
-        创建图片交互对象
+        创建增强版图片交互对象
 
-        :param image: 说明
+        :param image: 图片对象
         :type image: pygame.Surface
+        :param id: 卡牌ID（花色，点数）
+        :type id: Tuple[int, int]
+        :param pos: 初始位置
+        :type pos: Coord
         """
-        self._frame = image.get_rect()
         self._content = image
-        self._func = lambda : print("clicked")
+        self._frame = image.get_rect()
+        self._func = None
+        self._pos = pos
+        self._frame.left = int(pos.x)
+        self._frame.top = int(pos.y)
+        self._id = id
+        self._choosen: bool = False
+        self._move_up_next: bool = True  # 交替移动方向
 
     def _events(self, event: pygame.event.Event):
         """
-        从属于_handle，用于自定义对单一特定交互事件的处理
+        处理交互事件
 
         :param event: 本次处理的事件
         :type event: pygame.event
         """
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if self._frame.collidepoint(event.pos):
-                self._func()
+            if self._frame.collidepoint(event.pos) and self._func:
+                self._func(self)
+                self._choosen = not self._choosen
                 return 1
         return 0
 
     def _display(self, surface: pygame.Surface) -> None:
-        pygame.draw.rect(surface, (0, 0, 0), self._frame)
-        surface.blit(self._content,
-                     (self._frame.centerx - self._content.get_width() // 2,
-                      self._frame.centery - self._content.get_height() // 2)
-                     )
+        # 绘制图像
+        surface.blit(self._content, (self._frame.x, self._frame.y))
+
+    @property
+    def id(self) -> Tuple[int, int]:
+        return self._id
+            
+    def movetoCoord(self, coord: Coord) -> None:
+        """
+        移动到指定坐标
+        """
+        self._frame.x = int(coord.x)
+        self._frame.y = int(coord.y)
+        self._pos = coord
+        
+        if self._surface:
+            self._display(self._surface)
+            pygame.display.update(self._frame)
+    
+    def movetowards(self, direc: str, dis: float) -> None:
+        """
+        向指定方向移动
+        
+        :param direc: 方向('u'为向上, 'd'为向下, 'l'为向左, 'r'为向右)
+        :type direc: str
+        :param dis: 移动距离
+        :type dis: float
+        """
+        old_rect = self._frame.copy()
+        
+        match direc:
+            case 'u':
+                self._frame.move_ip(0, -dis)
+            case 'd':
+                self._frame.move_ip(0, dis)
+            case 'l':
+                self._frame.move_ip(-dis, 0)
+            case 'r':
+                self._frame.move_ip(dis, 0)
+            case _:
+                return
+        
+        self._pos = Coord(self._frame.x, self._frame.y)
+        
+        if self._surface:
+            # 清除旧位置
+            pygame.draw.rect(self._surface, (255, 255, 255), old_rect)
+            # 绘制新位置
+            self._display(self._surface)
+            # 更新显示区域
+            pygame.display.update([old_rect, self._frame])
+    
+    def move_alternating(self, dis: float) -> None:
+        """
+        交替移动：第一次向上，第二次向下，以此类推
+        
+        :param dis: 移动距离
+        :type dis: float
+        """
+        if self._move_up_next:
+            self.movetowards('u', dis)
+            logger(f"ID {self._id}: 向上移动", t="TRACE", thread="CardImageObject")
+        else:
+            self.movetowards('d', dis)
+            logger(f"ID {self._id}: 向下移动", t="TRACE", thread="CardImageObject")
+        
+        # 切换下一次的方向
+        self._move_up_next = not self._move_up_next
+    
+    @property
+    def ischoosen(self) -> bool:
+        return self._choosen
+    
+    def get_position(self) -> Coord:
+        """
+        获取当前坐标
+        """
+        return Coord(self._frame.x, self._frame.y)
 
 # UI控件工厂
 class InteractorAreaFactory(metaclass = ABCMeta):
@@ -514,28 +610,55 @@ class ButtonFactory(InteractorAreaFactory):
         button_text = text_obj.render(text.text, antialias, tuple(text.color))
         return Button(button_rect, button_color, border, button_text)
 
-class ImageObjectFactory(InteractorAreaFactory):
+class CardImageObjectFactory(InteractorAreaFactory):
     """
-    自定义组件ImageObject的工厂类
+    增强版CardImageObject的工厂类
     """
     def construct(self,
-                  src : str,
-                  _start_pos : Tuple[float, float] # 待使用
-                  ) -> ImageObject:
+                  type: Tuple[int, int],
+                  start_pos: Coord,
+                  ) -> Optional[CardImageObject]:
         """
-        构建组件ImageObject
+        构建组件CardImageObject
 
-        :param src: 图片相对路径
-        :type src: str
+        :param type: 卡牌类型（花色，点数）
+        :type type: Tuple[int, int]
         :param start_pos: 图片左上角坐标
-        :type start_pos: Tuple[float, float]
-        :return: ImageObject对象
-        :rtype: ImageObject
+        :type start_pos: Coord
+        :return: CardImageObject对象或空(如果type非法)
+        :rtype: Optional[CardImageObject]
         """
-        image = pygame.image.load(src)
-        return ImageObject(image)
-# UI界面设计
+        # 根据花色确定图片文件名
+        match type[0]:
+            case 0:
+                src = "heart_"
+            case 1:
+                src = "spade_"
+            case 2:
+                src = "club_"
+            case 3:
+                src = "diamond_"
+            case _:
+                return None
+        
+        # 构建图片路径
+        image_path = os.path.join("src", "cards", f"{src}{type[1]}.png")
+        
+        try:
+            image = pygame.image.load(image_path)
+            # 缩放图像到合适大小
+            image = pygame.transform.scale(image, (80, 120))
+            return CardImageObject(image, type, start_pos)
+        except pygame.error as e:
+            logger(f"加载图片失败: {e}", t="ERROR", thread="CardImageObjectFactory")
+            logger(f"尝试加载的路径: {os.path.abspath(image_path)}", t="TRACE", thread="CardImageObjectFactory")
+            # 创建替代图像（红色背景白色边框）
+            image = pygame.Surface((80, 120))
+            image.fill((255, 0, 0))
+            pygame.draw.rect(image, (255, 255, 255), (5, 5, 70, 110), 2)
+            return CardImageObject(image, type, start_pos)
 
+# UI界面设计
 def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
     """
     欢迎界面
@@ -543,16 +666,18 @@ def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
     :param surface: pygame主窗口
     :type surface: pygame.Surface
     """
-    global RUNNING, UI_MAIN
-
-    logger("Rendering welcome_screen.", t = "TRACE", thread = "welcome_screen/self._surfunc")
-    def start_buttons_job():
+    global RUNNING, UI_MAIN, FRENDERWELCOME
+    
+    if FRENDERWELCOME:
+        logger("Rendering welcome_screen.", t = "TRACE", thread = "welcome_screen/self._surfunc")
+        FRENDERWELCOME = False
+        
+    def start_buttons_job(button : InteractorArea):
         """
         start_button绑定的方法
         """
-        asyncio.create_task(sk_main.send("1"))
+        asyncio.create_task(sk_main.send("1")) # -> server.server._client_run
         UI_MAIN.switch_surfunc(waiting_screen)
-        # 待添加socket交互
 
     welcome_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
 
@@ -588,28 +713,24 @@ def welcome_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
                                            )
     start_button.bind(start_buttons_job)
     start_button.run(surface)
-    # surface.fill((255, 255, 255))
+    
+    # pygame.display.flip()
 
-def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
+def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain") -> None:
     """
     等待连接界面
 
     :param surface: pygame主窗口
     :type surface: pygame.Surface
     """
-    global UI_MAIN, RUNNING
-    logger("Rendering waiting_screen.", t = "TRACE", thread = "waiting_screen/self._surfunc")
+    global UI_MAIN, RUNNING, FRENDERWAITING
+    if FRENDERWAITING:
+        logger("Rendering waiting_screen.", t = "TRACE", thread = "waiting_screen/self._surfunc")
+        FRENDERWAITING = False
     
-    def return_buttons_job():
-        """
-        return_button绑定的方法
-        """
-        UI_MAIN.switch_surfunc(welcome_screen)
-        asyncio.create_task(sk_main.send("0"))
-
-    welcome_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
-
-    surface.blit(welcome_bg, (0, 0))
+    waiting_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
+    surface.blit(waiting_bg, (0, 0))
+    
     waiting_board = BOARDFACTORY.construct(Coord(360, 150),
                                            Size(560, 420),
                                            Color(255, 255, 255),
@@ -632,49 +753,48 @@ def waiting_screen(surface : pygame.Surface, sk_main: "SocketMain"):
                                           )
     waiting_text.run(surface)
 
-    return_button = BUTTONFACTORY.construct((520, 360),
-                                            (240, 60),
-                                            Text("返回",
-                                                 "src\\fonts\\MicrosoftYaHei.ttf",
-                                                 18
-                                                 ),
-                                            border = Border(Color(255, 255, 255), 1)
-                                            )
-    return_button.bind(return_buttons_job)
-    return_button.run(surface)
-
-    # socket接受处理阶段
-
-
-
-def game_screen(surface: pygame.Surface):
+def game_screen(surface: pygame.Surface, sk_main : "SocketMain") -> None:
     """
-    游戏界面
+    游戏界面 待添加
 
     :param surface: pygame主窗口
     :type surface: pygame.Surface
     """
-    return
-# 特殊类型UI
-class Card(ImageObject):... # 待注释(C0115)，待实现
-
-class CardFactory(ImageObjectFactory):... # 待注释(C0115)，待实现
-
+    
+    global UI_MAIN, RUNNING, CARD_QUEUE
+    logger("Rendering game_screen.", t = "TRACE", thread = "game_screen/self._surfunc")
+    
+    game_bg = pygame.image.load("src\\bg\\game_bg.jpg")
+    surface.blit(game_bg, (0, 0))
+    
+    while not CARD_QUEUE:
+        waiting_text = LABELFACTORY.construct(
+            Text("等待发牌...", "src\\fonts\\MicrosoftYaHei.ttf", 36),
+            (500, 300),
+            (280, 50),
+            bg_apparent=True
+        )
+        waiting_text.run(surface)
+        return
+ 
 # 客户端主程序
 TESTADDR = ("127.0.0.1", 8888)
 WELCOMEFLAG = True
 GAMEFLAG = False
 RUNNING = True    # 程序运行标识
 SOCKETRUNNING = True
+FRENDERWELCOME = True
+FRENDERWAITING = True
 BUTTONFACTORY = ButtonFactory()
 LABELFACTORY = LabelFactory()
 BOARDFACTORY = BoardFactory()
+CardImageObjectFACTORY = CardImageObjectFactory()
 
 class UIMain():
     """
     存有线程ui_thread负责的ui主程序，主管ui绘制
     """
-
+    _screen : pygame.Surface
     def __init__(self, start_surfunc : Callable[[pygame.Surface, "SocketMain"], None]):
         """
         用一个界面方法初始化一个UIMain对象
@@ -691,6 +811,8 @@ class UIMain():
         :param new_surfunc: 新的界面((pygame.Surface) -> None)
         :type new_surfunc: Callable[[pygame.Surface], None]
         """
+        self._screen.fill((255, 255, 255))
+        pygame.display.flip()
         self._surfunc : Callable[[pygame.Surface, SocketMain], None] = new_surfunc
 
     async def _run(self) -> None:
@@ -702,10 +824,10 @@ class UIMain():
 
         pygame.font.init()
         pygame.init()
-        screen = pygame.display.set_mode((1280, 720))
+        self._screen = pygame.display.set_mode((1280, 720))
         pygame.display.set_caption("斗地主")
         clock = pygame.time.Clock()
-        
+        self._screen.fill((255, 255, 255))
         logger("Entering render loop", thread = "UI_MAIN")
         try:
             while RUNNING:
@@ -721,12 +843,9 @@ class UIMain():
                 if not pygame.display.get_init():
                     RUNNING = False
 
-                screen.fill((255, 255, 255))
-                pygame.display.flip()
-
                 # ui 绘制 start
                 if self._surfunc and SOCKET_MAIN:
-                    self._surfunc(screen, SOCKET_MAIN)
+                    self._surfunc(self._screen, SOCKET_MAIN)
                 # ui 绘制 end
 
                 await asyncio.sleep(0)
@@ -743,14 +862,15 @@ class UIMain():
         转入self._run运行
 
         """
-        logger("UI starts", t = "", thread = "UI_MAIN")
+        logger("UI starts", t = "INFO", thread = "UI_MAIN")
         await self._run()
 
 class SocketMain():
     """
     线程socket_thread负责的socket主程序，负责与server交换数据
     """
-    def __init__(self, addr : Tuple[str, int]): #初始化逻辑待完善
+    id = "0"
+    def __init__(self, addr : Tuple[str, int]):
         self._addr = addr
         self._listenmsg = asyncio.Queue()
         self._sendmsg = asyncio.Queue()
@@ -807,7 +927,7 @@ class SocketMain():
                 logger(f"Message '{msg}' ready to be sent.", t = "TRACE", thread = "send_task/self._send")
                 
                 if self._socket:
-                    await loop.sock_sendall(self._socket, msg.encode("utf-8"))
+                    await loop.sock_sendall(self._socket, (self.id + " " + msg).encode("utf-8"))
                     logger(f"Message {msg} has been sent.", t = "TRACE", thread = "send_task/self._send")
                     
                 self._sendmsg.task_done()
@@ -893,19 +1013,33 @@ class SocketMain():
 
     async def _run(self) -> None:
         """
-        客户端游戏逻辑的socket线程
+        客户端游戏逻辑的socket线程 待完善
 
         """
+        global CARD_QUEUE
         logger("Game task starts.", thread = "game_task/self._run")
         
-        connect_status = await self.recv()
+        connect_status = await self.recv() # <- server.server._handle_client
         if connect_status == "":
             logger("Connection timeout.", t = "WARN", thread = "game_task/self._run")
             return
         if connect_status == "failed":
             logger("Connection already full.", t = "WARN", thread = "game_task/self._run")
             return
-        logger("Connected successfully.", thread = "game_task/self._run")
+        self.id = connect_status
+        logger(f"Connected successfully, id is {id}.", thread = "game_task/self._run")
+        
+        ifbegin = await self.recv() # <- server.server._game_run
+        
+        if ifbegin:
+            if ifbegin != "begin":return
+            
+        logger("Game started.", t = "TRACE", thread = "game_task/self._run")
+        UI_MAIN.switch_surfunc(game_screen)
+        
+        CARD_QUEUE = eval(await self.recv()) # <- server.server._client_run
+        
+        
         try:
             input("self._run debug,enter to finish task")
         except BaseException:
@@ -916,17 +1050,20 @@ class SocketMain():
         socket总逻辑管理
 
         """
-        logger("Socket starts", thread = "SOCKET_MAIN")
-        
-        await self._connect()
-        logger("Connection established.", thread = "SOCKET_MAIN")
-        
-        send_task = asyncio.create_task(self._send())
-        listen_task = asyncio.create_task(self._listen())
-        game_task = asyncio.create_task(self._run())
-        life_task = asyncio.create_task(self.isalive())
-        
+        global RUNNING
         try:
+            logger("Socket starts", thread = "SOCKET_MAIN")
+            
+            result = await self._connect()
+            if not result:
+                raise TimeoutError("Connection timeout.")
+            logger("Connection established.", thread = "SOCKET_MAIN")
+            
+            send_task = asyncio.create_task(self._send())
+            listen_task = asyncio.create_task(self._listen())
+            game_task = asyncio.create_task(self._run())
+            life_task = asyncio.create_task(self.isalive())
+        
             logger("All socket tasks started.", thread = "SOCKET_MAIN")
             await asyncio.gather(send_task, listen_task, life_task, game_task)
             
@@ -943,12 +1080,15 @@ class SocketMain():
                 game_task, send_task, listen_task, life_task,
                 return_exceptions = True
                 )
-
+        except TimeoutError as e:
+            logger(str(e), t = "ERROR", thread = "SOCKET_MAIN")
+            RUNNING = False
+            
         finally:
             if self._socket:
                 self._socket.close()
+            self.close()
             logger("Socket close, SOCKET_MAIN finished!", thread = "SOCKET_MAIN")
-
 
     def close(self) -> None:
         """
@@ -969,3 +1109,5 @@ async def main():
     await asyncio.gather(SOCKET_MAIN.start(), UI_MAIN.start())
 
 asyncio.run(main())
+
+logger("")

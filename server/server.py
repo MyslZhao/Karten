@@ -12,26 +12,44 @@
 # + R0903:类的公共方法太少(小于2)。
 # + W0603:使用了global关键字，pylint不鼓励使用任何的global关键字以在函数内部更改全局变量。
 # + W0718:过于宽松的except异常捕获。
+import game
 import asyncio
+import os,sys
 from datetime import datetime
 
-def logger(msg : str, level : str = "log"):
+# 运行路径初始化
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+os.chdir(application_path)
+
+def logger(msg : str, t : str = "INFO", thread : str = "main", pipe : str = "file"):
     """
-    服务器控制台日志接口
+    客户端日志接口
 
     :param msg: 消息内容
-    :level msg: str
-    :param level: 消息等级(规定为log, note, warn三种等级)
-    :type level: str
+    :type msg: str
+    :param t: 消息等级(规定为INFO, TRACE, DEBUG, WARN, ERROR五种等级)
+    :type t: str
+    :param thread: 日志线程
+    :type thread: str
+    :param pipe: 日志输出管道(规定为cmd, file两种)
+    :type pipe: str
     """
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(timestamp + f" [{level}] {msg}")
-
-class Server:
+    if pipe == "cmd":
+        print(timestamp + f" [{thread}] {t} {msg}")
+    elif pipe == "file":
+        with open("test_server.log", "a") as f:
+            f.write(timestamp + f" [{thread}] {t} {msg}\n")
+            
+class server:
     """
     异步服务器类
     """
-    _max_connections = 3
+    _ready_status = 0
+    _MAX_CONNECTIONS = 3
     _current_connections = 0
     _counter_lock = asyncio.Lock()  # 保护计数器
     _clients = set()
@@ -55,7 +73,8 @@ class Server:
         """
         self._addr = addr
         self._port = port
-        self._max_connections = max_connection
+        self._MAX_CONNECTIONS = max_connection
+        self._game = game.Game()
 
     @property
     def current_clients(self) -> int:
@@ -67,6 +86,44 @@ class Server:
         """
         return len(self._clients)
 
+    async def _game_run(self):
+        while True:
+            if self._ready_status == 1: # debug: 3-> 1
+                logger("Single client debug permitted.", t = "DEBUG", thread = "lambda/self._game_run")
+                self._game.start()
+                await self.broadcast("begin") # -> client.SocketMain._run(2)
+                break
+    
+    async def _client_run(self, reader : asyncio.StreamReader, writer : asyncio.StreamWriter) -> None:
+        """
+        游戏相关进程
+
+        """
+        logger("Game task starts.", thread = "lambda/self._client_run")
+        READY = await reader.read() # <- client.welcome_screen
+        if READY:
+            self._ready_status += 1
+            id = int(READY[0])
+        else:
+            raise TimeoutError
+        
+        while not self._game.istart:
+            continue
+        
+        logger("All players ready, game starts.", t = "TRACE", thread = "lambda/self._client_run")
+        
+        writer.write(str(self._game.arrangeCards()[17 * (id - 1):id * 17]).encode("utf-8")) # -> client.SocketMain._run(3)
+        await writer.drain()
+        
+        
+        # 待完善
+        
+        
+        
+            
+            
+            
+            
     async def broadcast(self, message : str, sender : asyncio.StreamWriter|None = None) -> None:
         """
         向所有客户端广播消息
@@ -81,10 +138,7 @@ class Server:
                 client.write(message.encode("utf-8"))
                 await client.drain()
 
-    async def _handle_client(self,
-                             reader : asyncio.StreamReader,
-                             writer : asyncio.StreamWriter
-                             ) -> None:
+    async def _handle_client(self, reader : asyncio.StreamReader, writer : asyncio.StreamWriter) -> None:
         """
         处理客户端的请求(eq session)
 
@@ -96,9 +150,9 @@ class Server:
         addr = writer.get_extra_info("peername")
 
         async with self._counter_lock:
-            if self._current_connections >= self._max_connections:
-                logger(f"Connection is full, refuse {addr}.", level = "warn")
-                writer.write(b"Connection refused: server is full\r\n")
+            if self._current_connections >= self._MAX_CONNECTIONS:
+                logger(f"Connection is full, refuse {addr}.", t = "WARN")
+                writer.write(b"failed")   # 如果连接数已满，发送"failed"
                 await writer.drain()
                 writer.close()
                 await writer.wait_closed()
@@ -109,24 +163,14 @@ class Server:
             self._clients.add(writer)
 
         try:
-            writer.write(f"welcome:{len(self._clients)}\r\n".encode("utf-8"))
+            writer.write(str(self._current_connections).encode("utf-8"))   # -> client.SocketMain._run(1)
             logger(f'user "{addr}" has joined.')
             await writer.drain()
 
-            await self.broadcast(f"user:{addr} has joined\r\n", writer)
-
-            while True:
-                data = await reader.readline()
-                if not data:
-                    break
-
-                msg = data.decode("utf-8").strip()
-                if msg:
-                    logger(f"{addr}:{msg}")
-                    await self.broadcast(f"{addr}:{msg}\r\n", writer)
+            await self._client_run(reader, writer)
 
         except Exception as e:
-            logger(f"Connection exception: {e}", level = "warn")
+            logger(f"Connection exception: {e}", t = "WARN")
         finally:
 
             self._clients.remove(writer)
@@ -134,12 +178,13 @@ class Server:
                 writer.close()
             try:
                 await writer.wait_closed()
-            except BaseException:
+            except:
                 pass
+            
             logger(f'user "{addr}" exits.')
             async with self._counter_lock:
                 self._current_connections -= 1
-            await self.broadcast(f"user {addr} left chat.\r\n")
+            await self.broadcast(f"user {addr} left.\n")
 
     async def main(self) -> None:
         """
@@ -153,17 +198,19 @@ class Server:
 
         # 获取服务器地址
         addrs = ', '.join(str(sock.getsockname()) for sock in server.sockets)
-        logger(f"Server starts at {addrs}.")
+        logger("Server starts.")
 
         # 运行服务器
         async with server:
-            await server.serve_forever()
+            await asyncio.gather(server.serve_forever(), self._game_run())
 
 if __name__ == "__main__":
     # test start
-    a = Server()
+    a = server()
     try:
         asyncio.run(a.main())
     except KeyboardInterrupt:
         logger("Server stops.")
     # test end
+
+

@@ -2,5 +2,5 @@
     "iis.configDir": "",
     "C_Cpp.default.compilerPath": "cl.exe",
     "cmake.sourceDirectory": "D:/workspace/Karten/server",
-    "pylint.args":[ "--extension-pkg-whitelist-pygame", "--ERRORs-only"]
+    "pylint.args":[ "--extension-pkg-whitelist-pygame"]
 }

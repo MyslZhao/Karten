@@ -1,6 +1,6 @@
 from random import shuffle
 from enum import Enum
-from typing import List,Dict,Tuple,Optional,Any
+from typing import List,Dict,Tuple,Optional,Any, cast
 from dataclasses import dataclass
 import time
 # Card id
@@ -89,7 +89,7 @@ class Player:
 class Game:
     _start = False
     _lords : List[Tuple[int, int]] = []
-    class Type(Enum):
+    class类型(Enum):
         SINGLE = 1
         PAIR = 2
         SPRING = 3
@@ -132,9 +132,10 @@ class Game:
         return arrangements[:51]
         
     async def isfinished(self) -> Player:
+        a : Optional[Player] = None
         while self._start:
             for i in self._player:
                 if i and i.cardnum == 0:
                     self._start = False
                     a = i
-        return a
+        return cast(Player, a)

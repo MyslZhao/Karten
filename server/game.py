@@ -5,8 +5,7 @@ from dataclasses import dataclass
 import time
 # Card id
 CARD = [
-    [0, 0],
-    [0, 1],
+    [0, 1], #->3
     [0, 2],
     [0, 3],
     [0, 4],
@@ -18,8 +17,7 @@ CARD = [
     [0, 10],
     [0, 11],
     [0, 12],
-    [0, 13],
-    [1, 0],
+    [0, 13], #->2
     [1, 1],
     [1, 2],
     [1, 3],
@@ -58,7 +56,9 @@ CARD = [
     [3, 10],
     [3, 11],
     [3, 12],
-    [3, 13]
+    [3, 13],
+    [4, 14], #小王
+    [4, 15]  #大王
 ]
 
 class Suit(Enum):
@@ -151,6 +151,7 @@ class Game:
         NUM = [1, 2, 3]
         self._li = choice(NUM)
         ti = self._ind[self._li]
+        t : Player
         if ti:
             t = self._player[ti]
         if t:
@@ -158,10 +159,10 @@ class Game:
         return t
 
     async def isfinished(self) -> Player:
-        a : Optional[Player] = None
+        a : Player
         while self._start:
             for i in self._player:
                 if i and i.cardnum == 0:
                     self._start = False
                     a = i
-        return cast(Player, a)
+        return a

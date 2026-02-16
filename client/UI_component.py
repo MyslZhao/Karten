@@ -4,11 +4,25 @@
 + UI组件及控件
 + UI组件及控件的单例工厂
 """
+# pylint: disable=W0221
+# pylint: disable=R0903
+# 抑制警告：
+# + W0221:覆写方法与原方法参数数量不统一/出现不必要的可变参数。
+# + R0903:类的公共方法太少(小于2)。
 from dataclasses import dataclass
 from abc import ABCMeta, abstractmethod
 from typing import Any, Tuple, Optional, Callable
 import os
-from pygame import error, image, transform, Surface, Rect, display, SRCALPHA, draw, font, event, QUIT, MOUSEBUTTONDOWN
+from pygame import (
+    error, image, transform,
+    Surface, Rect,
+    SRCALPHA, draw, font,
+    event, MOUSEBUTTONDOWN
+    )
+
+# -*- encoding: utf-8 -*-
+
+# NOTE: 在下一次可能的更新前，该文件应消极改写。
 
 # 数据描述类
 @dataclass
@@ -63,12 +77,11 @@ class DisplayArea(metaclass = ABCMeta):
     """
     _content : Any = None
     _frame : Rect
-    _displayed : bool = False
 
     @abstractmethod
     def _display(self, surface : Surface) -> None:...
 
-    def run(self, surface : Surface) -> None:
+    def draw(self, surface : Surface) -> None:
         """
         在surface上启用显示组件
 
@@ -76,9 +89,6 @@ class DisplayArea(metaclass = ABCMeta):
         :type surface: pygame.Surface
         """
         self._display(surface)
-        if not self._displayed:
-            display.flip()
-            self._displayed = True
 
 class Board(DisplayArea):
     """
@@ -269,46 +279,15 @@ class InteractorArea(metaclass = ABCMeta):
     _frame = None
     _content = None
     _func = None
-    _displayed : bool = False
-    _surface : Optional[Surface] = None
 
     @abstractmethod
     def _display(self, surface : Surface) -> None:...
 
     @abstractmethod
-    def _events(self, event : event.Event) -> int:...
+    def handle_events(self, e : event.Event) -> bool:...
 
-    def _handle(self) -> int:
-        """
-        从属于self.run，用self._events来处理交互事件
-        规定若无匹配事件，需返回0以continue
-
-        :return: 返回状态值
-        :rtype: int
-        """
-        while True:
-            for e in event.get():
-                if e.type == QUIT:
-                    return -1
-                res = self._events(e)
-                if res == 0:
-                    continue
-                return res
-
-    def run(self, surface : Surface) -> None:
-        """
-        在surface上启用交互组件，是self._display与self._handle的联合体
-
-        :param surface: pygame主窗口
-        :type surface: pygame.Surface
-        """
-        global RUNNING
+    def draw(self, surface : Surface) -> None:
         self._display(surface)
-        if not self._displayed:
-            display.flip()
-            self._displayed = True
-        if self._handle() == -1:
-            RUNNING = False
 
     def bind(self, job : Callable[["InteractorArea"], None]) -> None:
         """
@@ -350,18 +329,19 @@ class Button(InteractorArea):
         self._content = text
         self._func = None
 
-    def _events(self, event: event.Event):
+    def handle_events(self, e: event.Event) -> bool:
         """
         从属于_handle，用于自定义对单一特定交互事件的处理
 
         :param event: 本次处理的事件
         :type event: pygame.event
         """
-        if event.type == MOUSEBUTTONDOWN:
-            if self._frame.collidepoint(event.pos) and self._func:
-                self._func(self)
-                return 1
-        return 0
+        if e.type == MOUSEBUTTONDOWN:
+            if self._frame.collidepoint(e.pos):
+                if self._func:
+                    self._func(self)
+                return True
+        return False
 
     def _display(self, surface : Surface) -> None:
         """
@@ -384,8 +364,8 @@ class CardImageObject(InteractorArea):
     增强版图片交互对象（整合了test.py的CardImageObject功能）
     """
     def __init__(self,
-                 image: Surface,
-                 id: Tuple[int, int],
+                 img: Surface,
+                 card_id: Tuple[int, int],
                  pos: Coord
                  ):
         """
@@ -398,29 +378,29 @@ class CardImageObject(InteractorArea):
         :param pos: 初始位置
         :type pos: Coord
         """
-        self._content = image
-        self._frame = image.get_rect()
+        self._content = img
+        self._frame = img.get_rect()
         self._func = None
         self._pos = pos
         self._frame.left = int(pos.x)
         self._frame.top = int(pos.y)
-        self._id = id
+        self._id = card_id
         self._choosen: bool = False
         self._move_up_next: bool = True  # 交替移动方向
 
-    def _events(self, event: event.Event):
+    def handle_events(self, e: event.Event) -> bool:
         """
         处理交互事件
 
         :param event: 本次处理的事件
         :type event: pygame.event
         """
-        if event.type == MOUSEBUTTONDOWN:
-            if self._frame.collidepoint(event.pos) and self._func:
+        if e.type == MOUSEBUTTONDOWN:
+            if self._frame.collidepoint(e.pos) and self._func:
                 self._func(self)
                 self._choosen = not self._choosen
-                return 1
-        return 0
+                return True
+        return False
 
     def _display(self, surface: Surface) -> None:
         # 绘制图像
@@ -438,10 +418,6 @@ class CardImageObject(InteractorArea):
         self._frame.y = int(coord.y)
         self._pos = coord
 
-        if self._surface:
-            self._display(self._surface)
-            display.update(self._frame)
-
     def movetowards(self, direc: str, dis: float) -> None:
         """
         向指定方向移动
@@ -451,8 +427,6 @@ class CardImageObject(InteractorArea):
         :param dis: 移动距离
         :type dis: float
         """
-        old_rect = self._frame.copy()
-
         match direc:
             case 'u':
                 self._frame.move_ip(0, -dis)
@@ -466,14 +440,6 @@ class CardImageObject(InteractorArea):
                 return
 
         self._pos = Coord(self._frame.x, self._frame.y)
-
-        if self._surface:
-            # 清除旧位置
-            draw.rect(self._surface, (255, 255, 255), old_rect)
-            # 绘制新位置
-            self._display(self._surface)
-            # 更新显示区域
-            display.update([old_rect, self._frame])
 
     def move_alternating(self, dis: float) -> None:
         """
@@ -492,6 +458,12 @@ class CardImageObject(InteractorArea):
 
     @property
     def ischoosen(self) -> bool:
+        """
+        是否处于选择状态
+
+        :return: 是否处于选择状态
+        :rtype: bool
+        """
         return self._choosen
 
     def get_position(self) -> Coord:
@@ -575,7 +547,6 @@ class CardImageObjectFactory(InteractorAreaFactory):
         :return: CardImageObject对象或空(如果type非法)
         :rtype: Optional[CardImageObject]
         """
-        # 根据花色确定图片文件名
         match type[0]:
             case 0:
                 src = "heart_"
@@ -585,18 +556,19 @@ class CardImageObjectFactory(InteractorAreaFactory):
                 src = "club_"
             case 3:
                 src = "diamond_"
+            case 4:
+                src = "joker_"
             case _:
                 return None
 
-        # 构建图片路径
-        image_path = os.path.join("src", "cards", f"{src}{type[1]}.png")
+        image_path = os.path.join("src", "cards", f"{src}{((type[1]) % 13 + 1) % 13 + 1}.png")
 
         try:
             i = image.load(image_path)
             # 缩放图像到合适大小
             i = transform.scale(i, (80, 120))
             return CardImageObject(i, type, start_pos)
-        except error as e:
+        except error:
             # 创建替代图像（红色背景白色边框）
             img = Surface((80, 120))
             img.fill((255, 0, 0))

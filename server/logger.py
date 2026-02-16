@@ -12,13 +12,13 @@ from datetime import datetime
 
 class Logger:
     """
-    客户端日志管理类
+    服务器日志管理类(在可能的更新中，可能会加新功能)
 
     """
     @classmethod
-    def write(cls, msg : str, t : str = "INFO", thread : str = "main", pipe : str = "file"):
+    def write(cls, msg : str, t : str = "INFO", thread : str = "main", pipe : str = "file") -> None:
         """
-        客户端日志写入接口
+        服务器日志写入接口
 
         :param msg: 消息内容
         :type msg: str
@@ -33,7 +33,7 @@ class Logger:
         if pipe == "cmd":
             print(timestamp + f" [{thread}] {t} {msg}")
         elif pipe == "file":
-            with open("client.log", "a", encoding = "utf-8") as f:
+            with open("serevr.log", "a", encoding = "utf-8") as f:
                 if msg == "":
                     f.write("\n")
                 else:

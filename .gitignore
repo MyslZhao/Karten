@@ -1,5 +1,6 @@
 .vs/
 .vscode/
+client/__pycache__/
 client/.venv/  
 server/.venv/
 server/__pycache__/   
@@ -11,4 +12,3 @@ server/__pycache__/
 pip-log.txt
 pip-delete-this-directory.txt
 test*
-.vscode/settings.json

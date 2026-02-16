@@ -12,11 +12,13 @@
 # + R0903:类的公共方法太少(小于2)。
 # + W0603:使用了global关键字，pylint不鼓励使用任何的global关键字以在函数内部更改全局变量。
 # + W0718:过于宽松的except异常捕获。
-from Game import Game, Player
 import asyncio
-import os,sys
+import os
+import sys
+import json
 from typing import List, cast
-from datetime import datetime
+from Game import Game, Player
+from logger import Logger
 
 # 运行路径初始化
 if getattr(sys, 'frozen', False):
@@ -25,31 +27,7 @@ else:
     application_path = os.path.dirname(os.path.abspath(__file__))
 os.chdir(application_path)
 
-def logger(msg : str, t : str = "INFO", thread : str = "main", pipe : str = "file"):
-    """
-    客户端日志接口
-
-    :param msg: 消息内容
-    :type msg: str
-    :param t: 消息等级(规定为INFO, TRACE, DEBUG, WARN, ERROR五种等级)
-    :type t: str
-    :param thread: 日志线程([**线程变量名**|**重要函数特称**|[[**lambda**|**协程任务变量名**]/[**方法名**|**self.方法名**]]])
-    :type thread: str
-    :param pipe: 日志输出管道(规定为cmd, file两种)
-    :type pipe: str
-    """
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    if pipe == "cmd":
-        print(timestamp + f" [{thread}] {t} {msg}")
-    elif pipe == "file":
-        print(timestamp + f" [{thread}] {t} {msg}")
-        with open("test_server.log", "a") as f:
-            if msg == "":
-                f.write("\n")
-            else:
-                f.write(timestamp + f" [{thread}] {t} {msg}\n")
-
-class server:
+class Server:
     """
     异步服务器类
     """
@@ -97,7 +75,7 @@ class server:
         while True:
             if self._ready_status == 3: # debug: 3-> 1
                 if self._ready_status == 1:
-                    logger("Single client debug permitted.", t = "DEBUG", thread = "_game_run")
+                    Logger.write("Single client debug permitted.", t = "DEBUG", thread = "_game_run")
                 self._game.start()
                 await self.broadcast("b") # -> client.SocketMain._run
                 break
@@ -105,14 +83,17 @@ class server:
 
         await asyncio.sleep(1)
 
-        logger("Enter game loop.", t = 'TRACE', thread = "_game_run")
-        NUMLIST = []
-        for i in self._game.playeridlist:
-            NUMLIST.append(self._game)
-        round = self._game.lordsid
+        Logger.write("Enter game loop.", t = 'TRACE', thread = "_game_run")
+        num_list = []
+        for i in range(1, 4):
+            num_list.append(self._game.playerlist[
+                self._game.playeridlist[i]
+            ].cardnum)
+        rnd = self._game.lordsid
         while True:
-            current_recv = self._readers[round - 1]
+            current_recv = self._readers[rnd - 1]
             if current_recv:
+                # 客户id + " " + 出牌数 + " " + 牌型JSON字符串 + "\n"
                 deploy_card = (await cast(
                     asyncio.StreamReader,current_recv
                     ).readuntil(b'\n')
@@ -125,14 +106,14 @@ class server:
         游戏相关进程
 
         """
-        logger("Game task starts.", thread = "_client_run")
+        Logger.write("Game task starts.", thread = "_client_run")
 
-        READY = (await reader.readuntil(b'\n')).decode("utf-8").strip().split() # <- client.welcome_screen
+        ready = (await reader.readuntil(b'\n')).decode("utf-8").strip().split() # <- client.welcome_screen
 
-        if READY:
+        if ready:
             self._ready_status += 1
-            id = int(READY[0])
-            self._game.addPlayer(Player(READY[0]))
+            player_id = int(ready[0])
+            self._game.addPlayer(Player(ready[0]))
 
         else:
             raise TimeoutError
@@ -141,30 +122,32 @@ class server:
             await asyncio.sleep(0.1)
             continue
         cl = self._game.arrangeCards()
-        logger("All players ready, game starts.", t = "TRACE", thread = "_client_run")
+        Logger.write("All players ready, game starts.", t = "TRACE", thread = "_client_run")
 
         # 公布地主牌
-        logger("Inform lord's cards", thread = "_client_run")
+        Logger.write("Inform lord's cards", thread = "_client_run")
         if self._game.lordscard:
-            await self.broadcast(str(self._game.lordscard)) # -> client.SocketMain._run
+            await self.broadcast(json.dumps(self._game.lordscard)) # -> client.SocketMain._run
 
         # 分配地主
-        logger("Arrange identities.", thread = "_client_run")
+        Logger.write("Arrange identities.", thread = "_client_run")
         self._game.arrangeIden()
-        i = self._game.playeridlist[id]
+        i = self._game.playeridlist[player_id]
         if i:
             p = self._game.playerlist[i]
         else:
             raise IndexError("The player id is not exist.")
         if p:
-            p.addCard(cl[17 * (id - 1):id * 17])
-            writer.write(('1\n' if p.identity else '0\n').encode("utf-8")) # -> client.SocketMian._run
+            p.addCard(cl[17 * (player_id - 1):player_id * 17])
+            writer.write((
+                '1\n' if p.identity else '0\n'
+                ).encode("utf-8")) # -> client.SocketMian._run
             await writer.drain()
         else:
             raise IndexError("The player of the id is lost.")
 
         # 发牌
-        logger("Arrange cards.", thread = "_client_run")
+        Logger.write("Arrange cards.", thread = "_client_run")
         if p and p.identity:
             if self._game.lordscard:
                 p.addCard(cast(List[List[int]], self._game.lordscard))
@@ -172,7 +155,7 @@ class server:
                 raise TypeError("Lordscard is not initialtive, please arrangeCards fst.")
         else:
             raise IndexError("The player of the id is lost.")
-        writer.write((str(p.cards) + '\n').encode("utf-8")) # -> client.SocketMain._run
+        writer.write((json.dumps(p.cards) + '\n').encode("utf-8")) # -> client.SocketMain._run
         await writer.drain()
 
     async def broadcast(self, message : str, sender : asyncio.StreamWriter|None = None) -> None:
@@ -188,7 +171,7 @@ class server:
             if client != sender:
                 client.write((message + '\n').encode("utf-8"))
                 await client.drain()
-                logger(f"Boardcast message: {message}", t = "TRACE", thread = "lambda/self.boardcast")
+                Logger.write(f"Boardcast message: {message}", t = "TRACE", thread = "lambda/self.boardcast")
 
     async def _handle_client(self, reader : asyncio.StreamReader, writer : asyncio.StreamWriter) -> None:
         """
@@ -203,7 +186,7 @@ class server:
 
         async with self._counter_lock:
             if self._current_connections >= self._MAX_CONNECTIONS:
-                logger(f"Connection is full, refuse {addr}.", t = "WARN", thread = "_handle_client")
+                Logger.write(f"Connection is full, refuse {addr}.", t = "WARN", thread = "_handle_client")
                 writer.write(b"f\n")   # 如果连接数已满，发送"failed"
                 await writer.drain()
                 writer.close()
@@ -217,15 +200,15 @@ class server:
 
         try:
             writer.write((str(self._current_connections) + '\n').encode("utf-8"))   # -> client.SocketMain._run
-            logger(f'user "{addr}" has joined.')
+            Logger.write(f'user "{addr}" has joined.')
             await writer.drain()
 
             await self._client_run(reader, writer)
 
         except (TimeoutError, ConnectionError) as e:
-            logger(f"Connection exception: {e}", t = "WARN", thread = "_handle_client")
+            Logger.write(f"Connection exception: {e}", t = "WARN", thread = "_handle_client")
         except BaseException as e:
-            logger(str(e), t = "ERROR", thread = "_handle_client")
+            Logger.write(str(e), t = "ERROR", thread = "_handle_client")
         finally:
 
             self._writers.remove(writer)
@@ -236,12 +219,12 @@ class server:
             except:
                 pass
 
-            logger(f'user "{addr}" exits.', thread = "_handle_client")
+            Logger.write(f'user "{addr}" exits.', thread = "_handle_client")
             async with self._counter_lock:
                 self._current_connections -= 1
 
             if self._game.istart:
-                logger(f'{addr} diconnected during game,resetting game.', t = "WARN", thread = "_handle_client")
+                Logger.write(f'{addr} diconnected during game,resetting game.', t = "WARN", thread = "_handle_client")
                 self._game = Game()
                 self._ready_status = 0
 
@@ -258,7 +241,7 @@ class server:
 
         # 获取服务器地址
         addrs = ', '.join(str(sock.getsockname()) for sock in server.sockets)
-        logger(f"Server starts on {addrs}.")
+        Logger.write(f"Server starts on {addrs}.")
 
         # 运行服务器
         async with server:
@@ -266,13 +249,13 @@ class server:
 
 if __name__ == "__main__":
     # test start
-    a = server()
+    a = Server()
     try:
         asyncio.run(a.main())
     except KeyboardInterrupt:
-        logger("Server stops.")
+        Logger.write("Server stops.")
     # test end
 
-logger("")
+Logger.write("")
 
 

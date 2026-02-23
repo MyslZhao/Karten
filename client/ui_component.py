@@ -11,8 +11,10 @@
 # + R0903:类的公共方法太少(小于2)。
 from dataclasses import dataclass
 from abc import ABCMeta, abstractmethod
-from typing import Any, Tuple, Optional, Callable
+from typing import Any, Tuple, Optional, Callable, cast
 import os
+from enum import Enum
+from copy import deepcopy
 from pygame import (
     error, image, transform,
     Surface, Rect,
@@ -23,6 +25,7 @@ from pygame import (
 # -*- encoding: utf-8 -*-
 
 # NOTE: 在下一次可能的更新前，该文件应消极改写。
+# NOTE: 后续组件考虑加入更高级的内容
 
 # 数据描述类
 @dataclass
@@ -70,6 +73,14 @@ class Border:
     color : Color
     width : int
 
+class RectPtn(Enum):
+    """
+    CIO中碰撞矩形覆盖方式
+    """
+    FULL = 0
+    DISPLAYED = 1
+    HIDDEN = 2
+
 # UI组件
 class DisplayArea(metaclass = ABCMeta):
     """
@@ -89,6 +100,10 @@ class DisplayArea(metaclass = ABCMeta):
         :type surface: pygame.Surface
         """
         self._display(surface)
+
+    @property
+    def content(self) -> Any:
+        return self._content
 
 class Board(DisplayArea):
     """
@@ -181,6 +196,19 @@ class Label(DisplayArea):
                          self._frame.centery - self._content.get_height() // 2
                      ))
 
+class CardImage(DisplayArea):
+    """牌图片类(简单版本)
+    """
+    def __init__(self,
+                 img : Surface,
+                 coord : Tuple[int, int]
+                 ):
+        self._content = img
+        self._coord = coord
+
+    def _display(self, surface: Surface) -> None:
+        surface.blit(self._content, self._coord)
+
 # UI组件工厂
 class DisplayAreaFactory(metaclass = ABCMeta):
     """
@@ -238,7 +266,7 @@ class LabelFactory(DisplayAreaFactory):
     """
     def construct(self,
                  text : Text,
-                 start_pos : Tuple[float, float],
+                 start_pos : Coord,
                  size : Tuple[float, float],
                  bg_apparent : bool = False,
                  bg_color : Tuple[int, int, int] = (255, 255, 255),
@@ -252,7 +280,7 @@ class LabelFactory(DisplayAreaFactory):
         :param text: Text数据包
         :type text: str
         :param start_pos: Label左上角像素坐标
-        :type start_pos: Tuple[float, float]
+        :type start_pos: Coord
         :param size: Label的长和宽
         :type size: Tuple[float, float]
         :param bg_apparent: Label背景透明化
@@ -266,12 +294,51 @@ class LabelFactory(DisplayAreaFactory):
         :return: Label对象
         :rtype: Label
         """
-        text_rect = Rect(start_pos[0], start_pos[1], size[0], size[1])
+        text_rect = Rect(start_pos.x, start_pos.y, size[0], size[1])
         text_obj = font.Font(text.font, text.size)
         text_surface = text_obj.render(text.text, antialias, tuple(text.color))
         return Label(text_surface, text_rect, bg_apparent, bg_color, border)
 
+class CardImageFactory(DisplayAreaFactory):
+    """牌图片类工厂
+    """
+    def construct(self,
+                  card_id : Tuple[int, int],
+                  start_pos : Coord
+                  ) -> Optional[CardImage]:
+        """构造牌显示对象
+
+        :param card_id: 牌id
+        :type card_id: Tuple[int, int]
+        :param start_pos: 绘制起始点(左上角坐标)
+        :type start_pos: Coord
+        :return: 牌显示对象或None
+        :rtype: Optional[CardImage]
+        """
+        match card_id[0]:
+            case 0:
+                src = "heart_"
+            case 1:
+                src = "spade_"
+            case 2:
+                src = "club_"
+            case 3:
+                src = "diamond_"
+            case 4:
+                src = "joker_"
+            case _:
+                return None
+
+        image_path = os.path.join("src", "cards", f"{src}{((card_id[1]) % 13 + 1) % 13 + 1}.png")
+        cache = (int(start_pos.x), int(start_pos.y))
+
+        i = image.load(image_path)
+        # 缩放图像到合适大小
+        i = transform.scale(i, (80, 120))
+        return CardImage(i, cache)
+
 # UI控件
+
 class InteractorArea(metaclass = ABCMeta):
     """
     UI交互控件抽象类
@@ -378,15 +445,51 @@ class CardImageObject(InteractorArea):
         :param pos: 初始位置
         :type pos: Coord
         """
+
         self._content = img
-        self._frame = img.get_rect()
+        self._src_frame = img.get_rect() # 储存原本的图形frame
+        self._frame = img.get_rect() # 储存交互应用的图形frame
         self._func = None
         self._pos = pos
-        self._frame.left = int(pos.x)
-        self._frame.top = int(pos.y)
+        # 抵消素材白边
+        self._frame.left = int(pos.x) + 10
+        self._frame.top = int(pos.y) + 10
+        self._frame.width -= 20
+        self._frame.height -= 20
+
+        # 初始化上升碰撞矩形
+        self._lift_frame : Rect = deepcopy(self._frame)
+        self._lift_frame.top -= 30
+        self._lift_frame.height = 30
+
+        self._src_frame.left = int(pos.x)
+        self._src_frame.top = int(pos.y)
         self._id = card_id
         self._choosen: bool = False
-        self._move_up_next: bool = True  # 交替移动方向
+
+    def reshape_frame(self, ptn : RectPtn, displd_width : int) -> None:
+        """
+        更改碰撞矩形的覆盖方式:
+        + 全图形覆盖
+        + 显示覆盖
+        + 隐藏
+
+        默认为全图形覆盖
+
+        :param ptn: 采用的碰撞策略
+        :type ptn: RectPtn
+        :param displd: (启用DISPLAYED时)图形显示的宽度
+        """
+        # HACK: 扑克牌左右叠放，只有宽度变化
+        # HACK: 在可能的更新中，会严格化DISPLAYED的范围
+        match ptn:
+            case RectPtn.FULL:
+                self._frame = self._src_frame
+            case RectPtn.DISPLAYED:
+                self._frame.width = displd_width
+            case RectPtn.HIDDEN:
+                self._frame.width = 0
+                self._frame.height = 0
 
     def handle_events(self, e: event.Event) -> bool:
         """
@@ -398,22 +501,31 @@ class CardImageObject(InteractorArea):
         if e.type == MOUSEBUTTONDOWN:
             if self._frame.collidepoint(e.pos) and self._func:
                 self._func(self)
-                self._choosen = not self._choosen
+                return True
+            elif (not self._choosen
+                ) and (self._lift_frame.collidepoint(e.pos)
+                       ) and self._func:
+                self._func(self)
                 return True
         return False
 
     def _display(self, surface: Surface) -> None:
         # 绘制图像
-        surface.blit(self._content, (self._frame.x, self._frame.y))
+        surface.blit(self._content, (self._src_frame.x, self._src_frame.y))
 
     @property
-    def id(self) -> Tuple[int, int]:
+    def card_id(self) -> Tuple[int, int]:
+        """
+        牌型id
+        """
         return self._id
 
-    def movetoCoord(self, coord: Coord) -> None:
+    def movetocoord(self, coord: Coord) -> None:
         """
         移动到指定坐标
         """
+        self._src_frame.x = int(coord.x)
+        self._src_frame.y = int(coord.y)
         self._frame.x = int(coord.x)
         self._frame.y = int(coord.y)
         self._pos = coord
@@ -430,16 +542,20 @@ class CardImageObject(InteractorArea):
         match direc:
             case 'u':
                 self._frame.move_ip(0, -dis)
+                self._src_frame.move_ip(0, -dis)
             case 'd':
                 self._frame.move_ip(0, dis)
+                self._src_frame.move_ip(0, dis)
             case 'l':
                 self._frame.move_ip(-dis, 0)
+                self._src_frame.move_ip(-dis, 0)
             case 'r':
                 self._frame.move_ip(dis, 0)
+                self._src_frame.move_ip(dis, 0)
             case _:
                 return
 
-        self._pos = Coord(self._frame.x, self._frame.y)
+        self._pos = Coord(self._src_frame.x, self._src_frame.y)
 
     def move_alternating(self, dis: float) -> None:
         """
@@ -448,13 +564,13 @@ class CardImageObject(InteractorArea):
         :param dis: 移动距离
         :type dis: float
         """
-        if self._move_up_next:
+        if not self._choosen:
             self.movetowards('u', dis)
         else:
             self.movetowards('d', dis)
 
         # 切换下一次的方向
-        self._move_up_next = not self._move_up_next
+        self._choosen = not self._choosen
 
     @property
     def ischoosen(self) -> bool:
@@ -470,7 +586,7 @@ class CardImageObject(InteractorArea):
         """
         获取当前坐标
         """
-        return Coord(self._frame.x, self._frame.y)
+        return Coord(self._src_frame.x, self._src_frame.y)
 
 # UI控件工厂
 class InteractorAreaFactory(metaclass = ABCMeta):
@@ -496,10 +612,10 @@ class ButtonFactory(InteractorAreaFactory):
     自定义组件Button的工厂类
     """
     def construct(self,
-                  start_pos : Tuple[float, float],
+                  start_pos : Coord,
                   size : Tuple[float, float],
                   text : Text = Text("", None, 18),
-                  button_color : Tuple[int, int, int] = (255, 255, 255),
+                  button_color : Color = Color(255, 255, 255),
                   border : Border = Border(Color(0, 0, 0), 0),
                   antialias : bool = True #启用字体平滑
                   ) -> Button:
@@ -508,7 +624,7 @@ class ButtonFactory(InteractorAreaFactory):
         预处理相关零散数据，包装为Button初始化所需的参数
 
         :param start_pos: Button左上角像素坐标
-        :type start_pos: Tuple[float, float]
+        :type start_pos: Coord
         :param size: Button的长和宽
         :type size: Tuple[float, float]
         :param text: Text数据包
@@ -522,19 +638,34 @@ class ButtonFactory(InteractorAreaFactory):
         :return: Button对象
         :rtype: Button
         """
-        button_rect = Rect(start_pos[0], start_pos[1], size[0], size[1])
+        button_rect = Rect(start_pos.x, start_pos.y, size[0], size[1])
+        bt_color = (0, 0, 0)
+        if len(tuple(button_color)) == 3:
+            bt_color = cast(Tuple[int, int, int], tuple(button_color))
+        else:
+            text_obj = font.Font("src\\fonts\\MicrosoftYaHei.ttf", text.size)
+            bt_text = text_obj.render("颜色错误", antialias, tuple(text.color))
+            return Button(button_rect,
+                          (0, 0, 0),
+                          border,
+                          bt_text
+                          )
         if text is None:
-            return Button(button_rect, button_color, border, None)
+            return Button(button_rect, bt_color, border, None)
         text_obj = font.Font(text.font, text.size)
         button_text = text_obj.render(text.text, antialias, tuple(text.color))
-        return Button(button_rect, button_color, border, button_text)
+        return Button(button_rect,
+                      bt_color,
+                      border,
+                      button_text
+                      )
 
 class CardImageObjectFactory(InteractorAreaFactory):
     """
     增强版CardImageObject的工厂类
     """
     def construct(self,
-                  type: Tuple[int, int],
+                  t: Tuple[int, int],
                   start_pos: Coord,
                   ) -> Optional[CardImageObject]:
         """
@@ -547,7 +678,7 @@ class CardImageObjectFactory(InteractorAreaFactory):
         :return: CardImageObject对象或空(如果type非法)
         :rtype: Optional[CardImageObject]
         """
-        match type[0]:
+        match t[0]:
             case 0:
                 src = "heart_"
             case 1:
@@ -561,21 +692,22 @@ class CardImageObjectFactory(InteractorAreaFactory):
             case _:
                 return None
 
-        image_path = os.path.join("src", "cards", f"{src}{((type[1]) % 13 + 1) % 13 + 1}.png")
+        image_path = os.path.join("src", "cards", f"{src}{((t[1]) % 13 + 1) % 13 + 1}.png")
 
         try:
             i = image.load(image_path)
             # 缩放图像到合适大小
-            i = transform.scale(i, (80, 120))
-            return CardImageObject(i, type, start_pos)
+            i = transform.scale(i, (100, 150))
+            return CardImageObject(i, t, start_pos)
         except error:
             # 创建替代图像（红色背景白色边框）
             img = Surface((80, 120))
             img.fill((255, 0, 0))
             draw.rect(img, (255, 255, 255), (5, 5, 70, 110), 2)
-            return CardImageObject(img, type, start_pos)
+            return CardImageObject(img, t, start_pos)
 
 BUTTONFACTORY = ButtonFactory()
 LABELFACTORY = LabelFactory()
 BOARDFACTORY = BoardFactory()
-CardImageObjectFACTORY = CardImageObjectFactory()
+CIOFACTORY = CardImageObjectFactory()
+CIFACTORY = CardImageFactory()

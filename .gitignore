@@ -1,8 +1,7 @@
 .vs/
 .vscode/
 client/__pycache__/
-client/.venv/  
-server/.venv/
+.venv/
 server/__pycache__/   
 *.log
 *.pyc

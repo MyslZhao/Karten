@@ -32,7 +32,7 @@ class Server:
     异步服务器类
     """
     _ready_status = 0
-    _MAX_CONNECTIONS = 3
+    _max_connections = 3
     _current_connections = 0
     _counter_lock = asyncio.Lock()  # 保护计数器
     _writers : List[asyncio.StreamWriter] = []
@@ -58,7 +58,7 @@ class Server:
         """
         self._addr = addr
         self._port = port
-        self._MAX_CONNECTIONS = max_connection
+        self._max_connections = max_connection
         self._game = Game()
 
     @property
@@ -73,13 +73,41 @@ class Server:
 
     async def _game_run(self):
         while True:
-            if self._ready_status == 3: # debug: 3-> 1
+            if self._ready_status == self._max_connections: # debug: 3-> 1
                 if self._ready_status == 1:
-                    Logger.write("Single client debug permitted.", t = "DEBUG", thread = "_game_run")
+                    Logger.write("Single client debug permitted.",
+                                 t = "DEBUG",
+                                 thread = "_game_run")
                 self._game.start()
                 await self.broadcast("b") # -> client.SocketMain._run
                 break
             await asyncio.sleep(0.1)
+
+        cl = self._game.arrangeCards()
+        Logger.write("All players ready, game starts.", t = "TRACE", thread = "_game_run")
+
+        # 公布地主牌
+        Logger.write("Inform lord's cards", thread = "_game_run")
+        if self._game.lordscard:
+            await self.broadcast(json.dumps(self._game.lordscard)) # -> client.SocketMain._run
+
+        # 分配地主
+        Logger.write("Arrange identities.", thread = "_game_run")
+        self._game.arrangeIden()
+        idenlist = ""
+        for ind in range(1, 4):
+            i = self._game.playeridlist[ind]
+            if i:
+                p = self._game.playerlist[i]
+            else:
+                raise IndexError("The player id is not exist.")
+            if p:
+                p.addCard(cl[17 * (ind - 1):ind * 17])
+                idenlist += "1" if p.identity else "0"
+
+            else:
+                raise IndexError("The player of the id is lost.")
+        await self.broadcast(idenlist) # -> client.SocketMian._run
 
         await asyncio.sleep(1)
 
@@ -93,22 +121,31 @@ class Server:
         while True:
             current_recv = self._readers[rnd - 1]
             if current_recv:
-                # 客户id + " " + 出牌数 + " " + 牌型JSON字符串 + "\n"
+                # 牌型发起者id_接收者id_出牌数_牌型JSON数据_原序列
                 deploy_card = (await cast(
                     asyncio.StreamReader,current_recv
                     ).readuntil(b'\n')
                                ).decode("utf-8")
-                dec_num = len(eval(deploy_card))
+                info = deploy_card.split(" ")
+                dec_num = int(info[2])
+                num_list[rnd - 1] -= dec_num
                 await self.broadcast(deploy_card)
+                if num_list[rnd] == 0:
+                    break
+                rnd = (rnd % 3) + 1
 
-    async def _client_run(self, reader : asyncio.StreamReader, writer : asyncio.StreamWriter) -> None:
+    async def _client_run(self,
+                          reader : asyncio.StreamReader,
+                          writer : asyncio.StreamWriter
+                          ) -> None:
         """
         游戏相关进程
 
         """
         Logger.write("Game task starts.", thread = "_client_run")
 
-        ready = (await reader.readuntil(b'\n')).decode("utf-8").strip().split() # <- client.welcome_screen
+        ready = (await reader.readuntil(b'\n')
+                 ).decode("utf-8").strip().split() # <- client.welcome_screen
 
         if ready:
             self._ready_status += 1
@@ -121,42 +158,23 @@ class Server:
         while not self._game.istart:
             await asyncio.sleep(0.1)
             continue
-        cl = self._game.arrangeCards()
-        Logger.write("All players ready, game starts.", t = "TRACE", thread = "_client_run")
-
-        # 公布地主牌
-        Logger.write("Inform lord's cards", thread = "_client_run")
-        if self._game.lordscard:
-            await self.broadcast(json.dumps(self._game.lordscard)) # -> client.SocketMain._run
-
-        # 分配地主
-        Logger.write("Arrange identities.", thread = "_client_run")
-        self._game.arrangeIden()
-        i = self._game.playeridlist[player_id]
-        if i:
-            p = self._game.playerlist[i]
-        else:
-            raise IndexError("The player id is not exist.")
-        if p:
-            p.addCard(cl[17 * (player_id - 1):player_id * 17])
-            writer.write((
-                '1\n' if p.identity else '0\n'
-                ).encode("utf-8")) # -> client.SocketMian._run
-            await writer.drain()
-        else:
-            raise IndexError("The player of the id is lost.")
 
         # 发牌
         Logger.write("Arrange cards.", thread = "_client_run")
-        if p and p.identity:
-            if self._game.lordscard:
-                p.addCard(cast(List[List[int]], self._game.lordscard))
+        i = self._game.playeridlist[player_id]
+        if i:
+            p = self._game.playerlist[i]
+            if p and p.identity:
+                if self._game.lordscard:
+                    p.addCard(cast(List[List[int]], self._game.lordscard))
+                else:
+                    raise TypeError("Lordscard is not initialtive, please arrangeCards fst.")
             else:
-                raise TypeError("Lordscard is not initialtive, please arrangeCards fst.")
+                raise IndexError("The player of the id is lost.")
+            writer.write((json.dumps(p.cards) + '\n').encode("utf-8")) # -> client.SocketMain._run
+            await writer.drain()
         else:
-            raise IndexError("The player of the id is lost.")
-        writer.write((json.dumps(p.cards) + '\n').encode("utf-8")) # -> client.SocketMain._run
-        await writer.drain()
+            raise IndexError("The player id is not exist.")
 
     async def broadcast(self, message : str, sender : asyncio.StreamWriter|None = None) -> None:
         """
@@ -171,9 +189,14 @@ class Server:
             if client != sender:
                 client.write((message + '\n').encode("utf-8"))
                 await client.drain()
-                Logger.write(f"Boardcast message: {message}", t = "TRACE", thread = "lambda/self.boardcast")
+                Logger.write(f"Boardcast message: {message}",
+                             t = "TRACE",
+                             thread = "lambda/self.boardcast")
 
-    async def _handle_client(self, reader : asyncio.StreamReader, writer : asyncio.StreamWriter) -> None:
+    async def _handle_client(self,
+                             reader : asyncio.StreamReader,
+                             writer : asyncio.StreamWriter
+                             ) -> None:
         """
         处理客户端的请求(eq session)
 
@@ -185,8 +208,10 @@ class Server:
         addr = writer.get_extra_info("peername")
 
         async with self._counter_lock:
-            if self._current_connections >= self._MAX_CONNECTIONS:
-                Logger.write(f"Connection is full, refuse {addr}.", t = "WARN", thread = "_handle_client")
+            if self._current_connections >= self._max_connections:
+                Logger.write(f"Connection is full, refuse {addr}.",
+                             t = "WARN",
+                             thread = "_handle_client")
                 writer.write(b"f\n")   # 如果连接数已满，发送"failed"
                 await writer.drain()
                 writer.close()
@@ -199,7 +224,8 @@ class Server:
             self._readers.append(reader)
 
         try:
-            writer.write((str(self._current_connections) + '\n').encode("utf-8"))   # -> client.SocketMain._run
+            writer.write((str(self._current_connections
+                              ) + '\n').encode("utf-8"))   # -> client.SocketMain._run
             Logger.write(f'user "{addr}" has joined.')
             await writer.drain()
 
@@ -216,7 +242,7 @@ class Server:
                 writer.close()
             try:
                 await writer.wait_closed()
-            except:
+            except Exception:
                 pass
 
             Logger.write(f'user "{addr}" exits.', thread = "_handle_client")
@@ -224,10 +250,11 @@ class Server:
                 self._current_connections -= 1
 
             if self._game.istart:
-                Logger.write(f'{addr} diconnected during game,resetting game.', t = "WARN", thread = "_handle_client")
+                Logger.write(f'{addr} diconnected during game,resetting game.',
+                             t = "WARN",
+                             thread = "_handle_client")
                 self._game = Game()
                 self._ready_status = 0
-
 
     async def main(self) -> None:
         """
@@ -245,17 +272,19 @@ class Server:
 
         # 运行服务器
         async with server:
-            await asyncio.gather(server.serve_forever(), self._game_run()) #bug src,待更改
+            await asyncio.gather(server.serve_forever(), self._game_run())
+
+a = Server()
+
+async def main():
+    while True:
+        try:
+            await a.main()
+        except KeyboardInterrupt:
+            Logger.write("Server stops.")
+            break
 
 if __name__ == "__main__":
-    # test start
-    a = Server()
-    try:
-        asyncio.run(a.main())
-    except KeyboardInterrupt:
-        Logger.write("Server stops.")
-    # test end
+    asyncio.run(main())
 
 Logger.write("")
-
-

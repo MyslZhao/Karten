@@ -4,6 +4,9 @@ from typing import List,Dict,Tuple,Optional,Any, cast
 from dataclasses import dataclass
 import time
 # Card id
+# HACK: 用List[int]而不是Tuple[int,int]
+# HACK: 我忘了我当时怎么想的了xp.
+# HACK: 在下一次可能的更新中会改正。
 CARD = [
     [0, 1], #->3
     [0, 2],

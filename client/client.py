@@ -1,4 +1,3 @@
-# pylint: skip-file
 """
 客户端程序，包含了：
 + 各个界面的pygame func
@@ -31,6 +30,7 @@ from ui_component import (
     CIFACTORY
 )
 from logger import Logger # DEBUG
+from path_utils import resource_path
 # -*- encoding: utf-8 -*-
 # pylint: disable=C2401
 
@@ -240,7 +240,7 @@ def welcome_screen(surface: pygame.Surface, ui_main : "UIMain", sk_main : "Socke
         start_button = BUTTONFACTORY.construct(Coord(520, 360),
                                             (240, 60),
                                             Text("开始",
-                                                    "src\\fonts\\MicrosoftYaHei.ttf",
+                                                    resource_path("src\\fonts\\MicrosoftYaHei.ttf"),
                                                     18
                                                     ),
                                             border = Border(Color(0, 0, 0), 1)
@@ -249,7 +249,7 @@ def welcome_screen(surface: pygame.Surface, ui_main : "UIMain", sk_main : "Socke
         ui_main.add_interactors(start_button)
 
     # 窗口背景载入
-    welcome_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
+    welcome_bg = pygame.image.load(resource_path("src\\bg\\welcome_bg.jpg"))
     surface.blit(welcome_bg, (0, 0))
     # 主Frame背景载入
     BOARDFACTORY.construct(
@@ -267,7 +267,7 @@ def welcome_screen(surface: pygame.Surface, ui_main : "UIMain", sk_main : "Socke
     LABELFACTORY.construct(
         Text(
             "斗地主",
-            "src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf",
+            resource_path("src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf"),
             70
             ),
         Coord(400, 200),
@@ -287,7 +287,7 @@ def waiting_screen(surface : pygame.Surface, _ui_main : "UIMain", _sk_main: "Soc
     :type _sk_main: SocketMain
     """
     # 窗口背景载入
-    waiting_bg = pygame.image.load("src\\bg\\welcome_bg.jpg")
+    waiting_bg = pygame.image.load(resource_path("src\\bg\\welcome_bg.jpg"))
     surface.blit(waiting_bg, (0, 0))
 
     # 主Frame背景载入
@@ -306,7 +306,7 @@ def waiting_screen(surface : pygame.Surface, _ui_main : "UIMain", _sk_main: "Soc
     LABELFACTORY.construct(
         Text(
             "等待其他玩家...",
-            "src\\fonts\\MicrosoftYaHei.ttf",
+            resource_path("src\\fonts\\MicrosoftYaHei.ttf"),
             70
             ),
         Coord(400, 200),
@@ -326,7 +326,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
     :param _sk_main: 异步通信类
     :type _sk_main: SocketMain
     """
-    game_bg = pygame.image.load("src\\bg\\game_bg.png")
+    game_bg = pygame.image.load(resource_path("src\\bg\\game_bg.png"))
     surface.blit(game_bg, (0, 0))
 
     CARD_STK.set_center(Coord(400, 550))
@@ -390,7 +390,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
             (100, 50),
             Text(
                 "出",
-                font = "src\\fonts\\button.ttf",
+                font = resource_path("src\\fonts\\button.ttf"),
                 size = 17
             ),
             button_color = Color(201, 175, 47)
@@ -404,7 +404,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
             (100, 50),
             Text(
                 "过",
-                font = "src\\fonts\\button.ttf",
+                font = resource_path("src\\fonts\\button.ttf"),
                 size = 17
             ),
             button_color = Color(164, 164, 164)
@@ -418,7 +418,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
         LABELFACTORY.construct(
             Text(
                 f"{'>' if TURN == prir else ''}上家({Idtt(IDENLIST[prir]).name}): {CARDS_NUMS[prir]}张牌",
-                "src\\fonts\\MicrosoftYaHei.ttf",
+                resource_path("src\\fonts\\MicrosoftYaHei.ttf"),
                 size = 20
                 ),
             Coord(1050, 20),
@@ -434,7 +434,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
         LABELFACTORY.construct(
             Text(
                 f"{'>' if TURN == ID else ''}本家({Idtt(IDENLIST[ID]).name}): {CARDS_NUMS[ID]}张牌",
-                "src\\fonts\\MicrosoftYaHei.ttf",
+                resource_path("src\\fonts\\MicrosoftYaHei.ttf"),
                 size = 20
                 ),
             Coord(1050, 60),
@@ -450,7 +450,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
         LABELFACTORY.construct(
             Text(
                 f"{'>' if TURN == nxt else ''}下家({Idtt(IDENLIST[nxt]).name}): {CARDS_NUMS[nxt]}张牌",
-                "src\\fonts\\MicrosoftYaHei.ttf",
+                resource_path("src\\fonts\\MicrosoftYaHei.ttf"),
                 size = 20
                 ),
             Coord(1050, 100),
@@ -492,7 +492,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
         LABELFACTORY.construct(
             Text(
                 f"{Idtt(IDENLIST[ISEND]).name}阵营胜利",
-                "src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf",
+                resource_path("src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf"),
                 40),
             Coord(1050, 330),
             (150, 30),
@@ -502,7 +502,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
         LABELFACTORY.construct(
             Text(
                 "20秒后关闭界面",
-                "src\\fonts\\MicrosoftYaHei.ttf",
+                resource_path("src\\fonts\\MicrosoftYaHei.ttf"),
                 12,
                 color = Color(162, 162, 162)
                 ),

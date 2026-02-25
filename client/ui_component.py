@@ -21,7 +21,7 @@ from pygame import (
     SRCALPHA, draw, font,
     event, MOUSEBUTTONDOWN
     )
-
+from path_utils import resource_path
 # -*- encoding: utf-8 -*-
 
 # NOTE: 在下一次可能的更新前，该文件应消极改写。
@@ -643,7 +643,7 @@ class ButtonFactory(InteractorAreaFactory):
         if len(tuple(button_color)) == 3:
             bt_color = cast(Tuple[int, int, int], tuple(button_color))
         else:
-            text_obj = font.Font("src\\fonts\\MicrosoftYaHei.ttf", text.size)
+            text_obj = font.Font(resource_path("src\\fonts\\MicrosoftYaHei.ttf"), text.size)
             bt_text = text_obj.render("颜色错误", antialias, tuple(text.color))
             return Button(button_rect,
                           (0, 0, 0),

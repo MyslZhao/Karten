@@ -1,4 +1,7 @@
 .vs/
+dist/
+build/
+*.spec
 .vscode/
 client/__pycache__/
 .venv/

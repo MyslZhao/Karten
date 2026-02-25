@@ -32,7 +32,7 @@ class CardsTransfer:
         """
         data_dict = asdict(send_cards)
         data_dict['pattern'] = send_cards.pattern.name
-        return json.dumps(data_dict)
+        return json.dumps(data_dict, separators=(',', ':'))
 
     @classmethod
     def decoson(cls, recv_cards : str) -> Cards:
@@ -71,16 +71,14 @@ class CardsTransfer:
                     msg,
                     src_list)
 
-        except ValueError as e:
-            print(f"Sender error: {e}")
+        except ValueError:
             return (
                             0, 0, 0,
                             Cards(Pattern.NONE, None),
                             [(-1, -1)]
                         )
 
-        except IndexError as e:
-            print(f"Sender error: {e}")
+        except IndexError:
             return (
                             0, 0, 0,
                             Cards(Pattern.NONE, None),
@@ -108,8 +106,8 @@ class CardsTransfer:
         :rtype: str
         """
         cache = cls.encoson(send_cards)
-        src_str = json.dumps(src_list)
-        return f"{player_id} {(player_id % 3) + 1} {cards_num} {cache} {src_str}"
+        src_str = json.dumps(src_list, separators=(',', ':'))
+        return f'{player_id} {(player_id % 3) + 1} {cards_num} {cache} {src_str}'
 
     @classmethod
     def passcode(cls,
@@ -124,4 +122,4 @@ class CardsTransfer:
         """
         i = old_str.split(" ")
         next_id = (int(i[1]) % 3) + 1
-        return f"{i[0]} {next_id} {0} {i[3]} {i[4]}"
+        return f'{i[0]} {next_id} {0} {i[3]} {i[4]}'

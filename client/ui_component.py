@@ -697,6 +697,7 @@ class CardImageObjectFactory(InteractorAreaFactory):
         try:
             i = image.load(image_path)
             # 缩放图像到合适大小
+            # NOTE: 鉴于没找到合适的小丑牌图片,小丑牌与其他牌大小不一
             i = transform.scale(i, (100, 150))
             return CardImageObject(i, t, start_pos)
         except error:

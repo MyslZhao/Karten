@@ -33,7 +33,7 @@ class Logger:
         if pipe == "cmd":
             print(timestamp + f" [{thread}] {t} {msg}")
         elif pipe == "file":
-            with open("serevr.log", "a", encoding = "utf-8") as f:
+            with open("server.log", "a", encoding = "utf-8") as f:
                 if msg == "":
                     f.write("\n")
                 else:

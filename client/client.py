@@ -1,3 +1,4 @@
+# pylint: skip-file
 """
 客户端程序，包含了：
 + 各个界面的pygame func
@@ -29,7 +30,7 @@ from ui_component import (
     BUTTONFACTORY, LABELFACTORY, BOARDFACTORY, CIOFACTORY,
     CIFACTORY
 )
-from logger import Logger
+from logger import Logger # DEBUG
 # -*- encoding: utf-8 -*-
 # pylint: disable=C2401
 
@@ -54,7 +55,7 @@ LORD_QUEUE : List[Optional[List[int]]] = [] # 地主牌型
 CARD_SEND : Tuple[int, Cards] = (-1, Cards(Pattern.NONE, None))
 SRC_LIST : List[Tuple[int, int]] = [(-1, -1)]
 # 得到的广播牌型(id + 牌型)
-CARD_RECV : Tuple[int, Cards] = (0, Cards(Pattern.NONE, None))
+CARD_RECV : Tuple[int, Cards] = (-1, Cards(Pattern.NONE, None))
 # 储存所有玩家的牌数供显示, id -> cn
 CARDS_NUMS : List[int] = [0, 17, 17, 17]
 # 显示区域
@@ -196,10 +197,8 @@ class Cardstack:
         """
         for i in self._render_cards:
             if i and i.ischoosen:
-                print(i.card_id)
                 i.move_alternating(30)
 
-        print(self._clicked_cards)
         self._clicked_cards.clear()
 
     def remove_clicked(self) -> None:
@@ -345,7 +344,20 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
                 CARD_STK.recover_clicked()
                 return
 
-            if CARD_RECV[0] != RELATIVE_ID[-1]:
+            if CARD_RECV[0] == -1:
+                clicked_queue = CARD_STK.clicked_card
+                if clicked_queue:
+                    cld_queue = cast(List[List[int]], clicked_queue)
+                    cd = Identifier.identify(cld_queue)
+                    if cd.pattern == Pattern.NONE:
+                        CARD_STK.recover_clicked()
+                    else:
+                        CARD_SEND = (len(cld_queue), cd)
+                        SRC_LIST = cast(List[Tuple[int, int]], [tuple(i) for i in cld_queue])
+                        CARD_STK.remove_clicked()
+                return
+
+            if CARD_RECV[0] != ID:
                 return
 
             clicked_queue = CARD_STK.clicked_card
@@ -358,9 +370,9 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
                 else:
                     res = Judger.compare(CARD_RECV[1], cd)
                     if res == 2:
-                        CARD_STK.remove_clicked()
                         SRC_LIST = cast(List[Tuple[int, int]], [tuple(i) for i in cld_queue])
                         CARD_SEND = (len(cld_queue), cd)
+                        CARD_STK.remove_clicked()
                     else:
                         CARD_STK.recover_clicked()
 
@@ -402,53 +414,54 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
 
     prir = ID - 1 if ID - 1 else 3
     nxt = (ID % 3) + 1
-    LABELFACTORY.construct(
-        Text(
-            f"{'>' if TURN == prir else ''}上家({Idtt(IDENLIST[prir]).name}): {CARDS_NUMS[prir]}张牌",
-            "src\\fonts\\MicrosoftYaHei.ttf",
-            size = 20
-            ),
-        Coord(1050, 20),
-        size = (180, 30),
-        bg_apparent = False,
-        bg_color = (190, 45, 37),
-        border = Border(
-            Color(0, 0, 0),
-            width = 1
-            )
-        ).draw(surface) # 上家牌数
+    if -1 not in IDENLIST:
+        LABELFACTORY.construct(
+            Text(
+                f"{'>' if TURN == prir else ''}上家({Idtt(IDENLIST[prir]).name}): {CARDS_NUMS[prir]}张牌",
+                "src\\fonts\\MicrosoftYaHei.ttf",
+                size = 20
+                ),
+            Coord(1050, 20),
+            size = (180, 30),
+            bg_apparent = False,
+            bg_color = (190, 45, 37),
+            border = Border(
+                Color(0, 0, 0),
+                width = 1
+                )
+            ).draw(surface) # 上家牌数
 
-    LABELFACTORY.construct(
-        Text(
-            f"{'>' if TURN == ID else ''}本家({Idtt(IDENLIST[ID]).name}): {CARDS_NUMS[ID]}张牌",
-            "src\\fonts\\MicrosoftYaHei.ttf",
-            size = 20
-            ),
-        Coord(1050, 60),
-        size = (180, 30),
-        bg_apparent = False,
-        bg_color = (190, 185, 37),
-        border = Border(
-            Color(0, 0, 0),
-            width = 1
-            )
-        ).draw(surface) # 本家牌数
+        LABELFACTORY.construct(
+            Text(
+                f"{'>' if TURN == ID else ''}本家({Idtt(IDENLIST[ID]).name}): {CARDS_NUMS[ID]}张牌",
+                "src\\fonts\\MicrosoftYaHei.ttf",
+                size = 20
+                ),
+            Coord(1050, 60),
+            size = (180, 30),
+            bg_apparent = False,
+            bg_color = (190, 185, 37),
+            border = Border(
+                Color(0, 0, 0),
+                width = 1
+                )
+            ).draw(surface) # 本家牌数
 
-    LABELFACTORY.construct(
-        Text(
-            f"{'>' if TURN == nxt else ''}下家({Idtt(IDENLIST[nxt]).name}): {CARDS_NUMS[nxt]}张牌",
-            "src\\fonts\\MicrosoftYaHei.ttf",
-            size = 20
-            ),
-        Coord(1050, 100),
-        size = (180, 30),
-        bg_apparent = False,
-        bg_color = (117, 190, 37),
-        border = Border(
-            Color(0, 0, 0),
-            width = 1
-            )
-        ).draw(surface) # 下家牌数
+        LABELFACTORY.construct(
+            Text(
+                f"{'>' if TURN == nxt else ''}下家({Idtt(IDENLIST[nxt]).name}): {CARDS_NUMS[nxt]}张牌",
+                "src\\fonts\\MicrosoftYaHei.ttf",
+                size = 20
+                ),
+            Coord(1050, 100),
+            size = (180, 30),
+            bg_apparent = False,
+            bg_color = (117, 190, 37),
+            border = Border(
+                Color(0, 0, 0),
+                width = 1
+                )
+            ).draw(surface) # 下家牌数
 
     # 绘制地主牌展示
     if LORD_QUEUE:
@@ -478,7 +491,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
     if ISEND:
         LABELFACTORY.construct(
             Text(
-                f"{Idtt(IDENLIST[TURN]).name}阵营胜利",
+                f"{Idtt(IDENLIST[ISEND]).name}阵营胜利",
                 "src\\fonts\\No.400-ShangShouZhaoPaiTi-2.ttf",
                 40),
             Coord(1050, 330),
@@ -500,6 +513,7 @@ def game_screen(surface: pygame.Surface, ui_main : "UIMain", _sk_main : "SocketM
 
 # 客户端主程序
 TESTADDR = ("127.0.0.1", 8888)
+ADDR = (input("输入服务器ip(忘记设计ip输入组件了xp):"), 8888)
 
 class UIMain():
     """
@@ -621,7 +635,7 @@ class UIMain():
                 await asyncio.sleep(1/60)
 
         except KeyboardInterrupt as e:
-            print(f"程序异常: {e}")
+            Logger.write(f"{e}", t = "ERROR", thread = "UI_MAIN")
         finally:
             # 确保资源被正确释放
             pygame.quit()
@@ -692,7 +706,7 @@ class SocketMain():
             return True
 
         except (ConnectionError, OSError, asyncio.TimeoutError) as e:
-            Logger.write(f"Connection failed: {e}", thread="lambda/self._connect")
+            Logger.write(f"Connection failed: {e}, plz check your addr.", thread="lambda/self._connect")
             if self._writer:
                 try:
                     self._writer.close()
@@ -751,6 +765,11 @@ class SocketMain():
             except asyncio.CancelledError as e:
                 Logger.write(f"Tasks cancelled : {e}", t = "WARN", thread = "send_task/self._send")
                 raise
+            except Exception as e:
+                if ISEND:
+                    Logger.write(f"{e}, but game was over.", thread = "send_task/self._send")
+                else:
+                    Logger.write(f"{e}, but the game is still going!", t = "ERROR", thread = "send_task/self._send")
 
     async def _listen(self) -> None:
         """
@@ -777,7 +796,7 @@ class SocketMain():
                 await self._listenmsg.put(msg)
 
             except (asyncio.IncompleteReadError, ConnectionError, OSError) as e:
-                Logger.write(str(e), t = "ERROR", thread = "listen_task/self._listen")
+                Logger.write(f"{e}, connect status is {self._connected}", t = "ERROR", thread = "listen_task/self._listen")
                 raise
             except asyncio.CancelledError as e:
                 Logger.write(f"Tasks cancelled : {e}", t = "WARN", thread = "send_task/self._send")
@@ -834,12 +853,13 @@ class SocketMain():
         RELATIVE_ID[-1] = 3 if ID - 1 == 0 else ID - 1
         RELATIVE_ID[1] = (ID % 3) + 1
         self.id = connect_status
-        Logger.write(f"Connected successfully, id is {id}.", thread = "game_task/self._run")
+        Logger.write(f"Connected successfully, id is {self.id}.", thread = "game_task/self._run")
 
-        ifbegin = await self.recv() # <- server.server._game_run
+        ifbegin = await self.recv(t = 180) # <- server.server._game_run
 
         if ifbegin:
             if ifbegin != "b":
+                Logger.write("Waiting timeout, exit automatically.", thread = "game_task/self._run")
                 return
 
         Logger.write("Game started.", t = "TRACE", thread = "game_task/self._run")
@@ -860,10 +880,11 @@ class SocketMain():
         Logger.write("Round loops.", thread = "game_task/self._run")
         recv_msg = ""
         while True:
-            if IDENTITY == TURN:
+            if ID == TURN:
                 # 出牌回合
                 res = await check_send_ready()
                 if res[0] == 0:
+                    Logger.write(f"passcode trigger, CARD_SEND = {res}", t = "DEBUG", thread = "game_task/self._run")
                     await self.send(
                         CardsTransfer.passcode(recv_msg)
                     )
@@ -881,15 +902,23 @@ class SocketMain():
                 # 非出牌回合
                 pass
 
-            recv_msg = await self.recv()
-            cache = CardsTransfer.parsetotuple(recv_msg)
-            CARDS_NUMS[RELATIVE_ID[-1]] -= cache[2]
+            while True:
+                recv_msg = await self.recv()
+                if recv_msg == "":
+                    continue
+                break
 
-            CARD_RECV = (cache[1], cache[3])
+            cache = CardsTransfer.parsetotuple(recv_msg)
+            CARDS_NUMS[cache[1] - 1 if cache[1] - 1 else 3] -= cache[2]
+
+            if cache[0] == cache[1] and ID == cache[1]:
+                CARD_RECV = (-1, Cards(Pattern.NONE, None))
+            else:
+                CARD_RECV = (cache[1], cache[3])
             DISPLAY_CARDS.clear()
             DISPLAY_CARDS = cast(List[Optional[Tuple[int, int]]], cache[4])
-            if CARDS_NUMS[RELATIVE_ID[-1]] == 0:
-                ISEND = 1
+            if 0 in CARDS_NUMS[1:]:
+                ISEND = CARDS_NUMS[1:].index(0) + 1
                 break
 
             TURN = cache[1]
@@ -907,6 +936,7 @@ class SocketMain():
             result = await self._connect()
             if not result:
                 raise TimeoutError("Connection timeout.")
+            self._connected = True
             Logger.write("Connection established.", thread = "SOCKET_MAIN")
 
             send_task = asyncio.create_task(self._send())
@@ -914,7 +944,21 @@ class SocketMain():
             game_task = asyncio.create_task(self._run())
 
             Logger.write("All socket tasks started.", thread = "SOCKET_MAIN")
-            await asyncio.gather(send_task, listen_task, game_task)
+            done, pending = await asyncio.wait([send_task, listen_task, game_task],
+                                         return_when = asyncio.FIRST_COMPLETED)
+
+            if game_task in done:
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions = True)
+            else:
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions = True)
+                for task in done:
+                    if task.exception():
+                        cache_exce = cast(BaseException, task.exception())
+                        raise cache_exce
 
         except asyncio.CancelledError as e:
             Logger.write(str(e), t = "ERROR", thread = "SOCKET_MAIN")
@@ -925,20 +969,17 @@ class SocketMain():
             raise
 
         except Exception as e:
-            Logger.write(str(e), t = "ERROR", thread = "SOVKET_MAIN")
+            Logger.write(str(e), t = "ERROR", thread = "SOCKET_MAIN")
             raise
 
         finally:
-            for task in (send_task, listen_task, game_task):
-                if task and not task.done():
-                    task.cancel()
-
             if self._writer and not self._writer.is_closing():
                 try:
                     self._writer.close()
+                    await self._writer.wait_closed()
                 except Exception:
                     pass
-
+            self._connected = False
 
             Logger.write("Socket close, SOCKET_MAIN finished!", thread = "SOCKET_MAIN")
             if ISEND:
@@ -948,8 +989,9 @@ async def main():
     """
     主函数
     """
-    socket_main = SocketMain(TESTADDR)
+    socket_main = SocketMain(ADDR)
     ui_main = UIMain(welcome_screen, socket_main)
+    CARD_STK.bind(ui_main)
     socket_main.set_ui(ui_main)
     ui_task = asyncio.create_task(ui_main.start(), name = "UI")
     socket_task = asyncio.create_task(socket_main.start(), name = "Socket")
@@ -971,6 +1013,7 @@ async def main():
             task.result()
         except Exception as e:
             Logger.write(f"Task {task.get_name} failed: {e}", t = "ERROR", thread = "Moudel/main")
+
 
 # 运行路径初始化
 if getattr(sys, 'frozen', False):

@@ -209,6 +209,134 @@ class CardImage(DisplayArea):
     def _display(self, surface: Surface) -> None:
         surface.blit(self._content, self._coord)
 
+# TODO: 待审核代码块 start
+class InputBox(DisplayArea):
+    """
+    文本输入框组件
+    """
+    def __init__(self,
+                 rect: Rect,
+                 text_info: Text,
+                 bg_color: Color,
+                 border: Border,
+                 active_border_color: Optional[Color] = None,
+                 cursor_color: Color = Color(0, 0, 0),
+                 max_length: int = 20,
+                 password_char: Optional[str] = None):
+        """
+        :param rect: 组件位置和大小
+        :param text_info: 文本信息（内容、字体、大小、颜色）
+        :param bg_color: 背景颜色
+        :param border: 边框数据
+        :param active_border_color: 激活时的边框颜色（默认与普通边框相同）
+        :param cursor_color: 光标颜色
+        :param max_length: 最大输入长度
+        :param password_char: 密码模式替换字符（如 '*'），None 表示正常显示
+        """
+        self._frame = rect
+        self._content = text_info.text  # 初始文本
+        self.text_color = tuple(text_info.color)
+        self.bg_color = tuple(bg_color)
+        self.border = border
+        self.border_color = tuple(border.color)
+        self.active_border_color = tuple(active_border_color) if active_border_color else self.border_color
+        self.cursor_color = tuple(cursor_color)
+        self.max_length = max_length
+        self.password_char = password_char
+
+        # 创建字体对象
+        if text_info.font is None:
+            self.font = font.Font(None, text_info.size)
+        else:
+            self.font = font.Font(text_info.font, text_info.size)
+
+        # 交互状态
+        self.active = False
+        self.cursor_visible = True
+        self.cursor_timer = 0
+        self.cursor_interval = 500  # 500ms 闪烁一次
+
+    def _display(self, surface: Surface) -> None:
+        """绘制输入框"""
+        # 绘制背景
+        temp_surf = Surface((self._frame.width, self._frame.height))
+        temp_surf.fill(self.bg_color)
+        surface.blit(temp_surf, self._frame.topleft)
+
+        # 绘制边框（激活时可能变色）
+        if self.border.width > 0:
+            border_color = self.active_border_color if self.active else self.border_color
+            draw.rect(surface, border_color, self._frame, self.border.width)
+
+        # 准备显示的文本（密码模式处理）
+        display_text = self._content
+        if self.password_char and self._content:
+            display_text = self.password_char * len(self._content)
+
+        # 渲染文本
+        text_surface = self.font.render(display_text, True, self.text_color)
+        # 垂直居中，左侧留5像素边距
+        text_x = self._frame.x + 5
+        text_y = self._frame.y + (self._frame.height - text_surface.get_height()) // 2
+        # 如果文本宽度超过输入框，考虑截断（简单处理：仅显示末尾部分）
+        if text_surface.get_width() > self._frame.width - 10:
+            # 裁剪文本，保留末尾能显示的部分
+            while text_surface.get_width() > self._frame.width - 10 and display_text:
+                display_text = display_text[1:]
+                text_surface = self.font.render(display_text, True, self.text_color)
+        surface.blit(text_surface, (text_x, text_y))
+
+        # 绘制光标（激活且可见时）
+        if self.active and self.cursor_visible:
+            cursor_x = text_x + text_surface.get_width() + 2
+            cursor_y = self._frame.y + 5
+            cursor_height = self.font.get_height()
+            draw.line(surface, self.cursor_color,
+                      (cursor_x, cursor_y),
+                      (cursor_x, cursor_y + cursor_height), 2)
+
+    def handle_event(self, event) -> None:
+        """处理输入事件（由主循环调用）"""
+        if event.type == MOUSEBUTTONDOWN:
+            # 鼠标点击切换激活状态
+            if self._frame.collidepoint(event.pos):
+                self.active = not self.active
+            else:
+                self.active = False
+            # 重置光标可见性
+            self.cursor_visible = True
+            self.cursor_timer = pygame.time.get_ticks()
+
+        if event.type == pygame.KEYDOWN and self.active:
+            if event.key == pygame.K_RETURN:
+                # 回车：可触发外部回调，这里只是示例
+                print(f"Input submitted: {self._content}")
+                # 可以在这里调用一个外部函数（通过回调）
+            elif event.key == pygame.K_BACKSPACE:
+                # 退格删除最后一个字符
+                self._content = self._content[:-1]
+            else:
+                # 普通字符输入
+                if event.unicode and event.unicode.isprintable():
+                    if len(self._content) < self.max_length:
+                        self._content += event.unicode
+
+    def update(self) -> None:
+        """更新光标闪烁状态（由主循环定期调用）"""
+        now = pygame.time.get_ticks()
+        if now - self.cursor_timer > self.cursor_interval:
+            self.cursor_visible = not self.cursor_visible
+            self.cursor_timer = now
+
+    @property
+    def text(self) -> str:
+        return self._content
+
+    @text.setter
+    def text(self, value: str) -> None:
+        self._content = value[:self.max_length]
+# NOTE: 待审核代码块 end
+
 # UI组件工厂
 class DisplayAreaFactory(metaclass = ABCMeta):
     """
@@ -336,6 +464,40 @@ class CardImageFactory(DisplayAreaFactory):
         # 缩放图像到合适大小
         i = transform.scale(i, (80, 120))
         return CardImage(i, cache)
+
+# NOTE: 待审核代码块 start
+class InputBoxFactory(DisplayAreaFactory):
+    """
+    输入框组件工厂（单例）
+    """
+    def construct(self,
+                  start_pos: Coord,
+                  size: Size,
+                  text: Text,
+                  bg_color: Color,
+                  border: Border = Border(Color(0,0,0), 1),
+                  active_border_color: Optional[Color] = None,
+                  cursor_color: Color = Color(0,0,0),
+                  max_length: int = 20,
+                  password_char: Optional[str] = None) -> InputBox:
+        """
+        构建 InputBox 实例
+        :param start_pos: 左上角坐标
+        :param size: 宽度和高度
+        :param text: 文本信息（初始内容、字体、大小、颜色）
+        :param bg_color: 背景颜色
+        :param border: 边框数据
+        :param active_border_color: 激活时的边框颜色（默认与普通边框相同）
+        :param cursor_color: 光标颜色
+        :param max_length: 最大输入长度
+        :param password_char: 密码字符
+        :return: InputBox 对象
+        """
+        rect = Rect(start_pos.x, start_pos.y, size.length, size.width)
+        return InputBox(rect, text, bg_color, border,
+                        active_border_color, cursor_color,
+                        max_length, password_char)
+# NOTE: 待审核代码块 end
 
 # UI控件
 
